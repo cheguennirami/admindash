@@ -70,7 +70,10 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public
+
+# Exception for Client React app
+!client/public/index.html
 
 # Storybook build outputs
 .out
