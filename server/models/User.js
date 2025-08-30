@@ -20,6 +20,10 @@ class User {
       const salt = await bcrypt.genSalt(12);
       userData.password = await bcrypt.hash(userData.password, salt);
     }
+    if (userData.password) {
+      const salt = await bcrypt.genSalt(12);
+      userData.password = await bcrypt.hash(userData.password, salt);
+    }
     return await supabase.create('users', userData);
   }
 

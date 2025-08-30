@@ -36,7 +36,7 @@ router.post('/login', [
     // Find user in database
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, password_hash, role_id, full_name, is_active')
+      .select('id, email, password, role, full_name, is_active, avatar, phone')
       .eq('email', email)
       .single();
 
@@ -50,7 +50,7 @@ router.post('/login', [
     }
 
     // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -58,21 +58,15 @@ router.post('/login', [
     // Generate token
     const token = generateToken(user.id);
 
-    // Get role name
-    const { data: roleData } = await supabase
-      .from('roles')
-      .select('name')
-      .eq('id', user.role_id)
-      .single();
-
     res.json({
       token,
       user: {
         id: user.id,
         fullName: user.full_name,
         email: user.email,
-        role: roleData ? roleData.name : user.role_id, // fallback to id if not found
-        avatar: '' // as per original
+        role: user.role,
+        avatar: user.avatar || '',
+        phone: user.phone
       }
     });
   } catch (error) {
@@ -169,7 +163,7 @@ router.put('/change-password', [
     }
 
     // Check current password
-    const isMatch = await User.comparePassword(currentPassword, user.password_hash);
+    const isMatch = await User.comparePassword(currentPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Current password is incorrect' });
     }
