@@ -25,9 +25,9 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-netlify-domain.netlify.app'] 
-    : ['http://localhost:3000'],
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://admindash-production.up.railway.app']
+    : ['http://localhost:3000', 'http://localhost:5000'],
   credentials: true
 }));
 
@@ -45,6 +45,21 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static file serving for React app
 app.use(express.static('public'));
 
+console.log('Static files being served from:', path.join(__dirname, 'public'));
+console.log('Current working directory:', process.cwd());
+console.log('Directory contents:', require('fs').readdirSync('.'));
+
+// Check if index.html exists
+const indexPath = path.join(__dirname, 'public', 'index.html');
+console.log('index.html path:', indexPath);
+console.log('index.html exists:', require('fs').existsSync(indexPath));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -53,9 +68,20 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
-// Health check
+// Health check with debug info
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Shein TO YOU API is running' });
+  const healthCheck = {
+    status: 'OK',
+    message: 'Shein TO YOU API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    port: process.env.PORT || 5000,
+    jsonbin_config: {
+      api_key_exists: !!process.env.JSONBIN_API_KEY,
+      bin_id_exists: !!process.env.JSONBIN_BIN_ID
+    }
+  };
+  res.json(healthCheck);
 });
 
 // Error handling middleware
