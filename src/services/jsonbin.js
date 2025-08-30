@@ -1,78 +1,70 @@
-// JSONBin Service for Frontend-Only Application
-const JSONBIN_BASE_URL = 'https://api.jsonbin.io/v3/b';
-const JSONBIN_API_KEY = process.env.REACT_APP_JSONBIN_API_KEY || 'your-api-key';
-const JSONBIN_BIN_ID = process.env.REACT_APP_JSONBIN_BIN_ID || 'your-bin-id';
+// Local JSON Storage Service (JSONBin alternative for deactivated accounts)
+const STORAGE_KEY = 'shein_dashboard_data';
 
-const headers = {
-  'Content-Type': 'application/json',
-  'X-Master-Key': JSONBIN_API_KEY,
-  'X-Bin-Versioning': 'false'
-};
-
-// Alternative headers for public bins (if needed)
-const publicHeaders = {
-  'Content-Type': 'application/json'
-};
-
-// Helper function to handle API requests
-const jsonbinRequest = async (method, data = null) => {
-  try {
-    const config = {
-      method,
-      headers,
-    };
-
-    if (data && (method === 'POST' || method === 'PUT')) {
-      config.body = JSON.stringify(data);
+// Default data structure
+const DEFAULT_DATA = {
+  "users": [
+    {
+      "_id": "admin-001",
+      "full_name": "Super Administrator",
+      "email": "admin@sheintoyou.com",
+      "password": "AdminPassword123!",
+      "role": "super_admin",
+      "isActive": true,
+      "avatar": "",
+      "phone": "",
+      "createdAt": new Date().toISOString(),
+      "updatedAt": new Date().toISOString()
     }
-
-    // Try with public access first (in case API key is not working)
-    const tempResponse = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
-      method,
-      headers: publicHeaders,
-    });
-
-    if (tempResponse.ok) {
-      const result = await tempResponse.json();
-      return result.record;
-    }
-
-    // If public access fails, try with API key
-    const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, config);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result.record;
-  } catch (error) {
-    console.error('JSONBin request failed:', error);
-    throw error;
+  ],
+  "clients": [],
+  "payments": [],
+  "settings": {
+    "initialized": true,
+    "version": "1.0.0"
   }
 };
 
-// Get all data from JSONBin
-export const getData = async () => {
-  return await jsonbinRequest('GET');
+// Helper functions for local storage operations
+const getData = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    } else {
+      // Initialize with default data
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DATA));
+      return DEFAULT_DATA;
+    }
+  } catch (error) {
+    console.error('Error reading local data:', error);
+    // Fallback to default data
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DATA));
+    return DEFAULT_DATA;
+  }
 };
 
-// Update data in JSONBin
-export const updateData = async (data) => {
-  return await jsonbinRequest('PUT', data);
+const updateData = (data) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return data;
+  } catch (error) {
+    console.error('Error saving local data:', error);
+    throw error;
+  }
 };
 
 // Authentication functions
 export const authOps = {
   // Get user by email
-  getUserByEmail: async (email) => {
-    const data = await getData();
+  getUserByEmail: (email) => {
+    const data = getData();
     return data.users ? data.users.find(user => user.email === email) : null;
   },
 
   // Update user profile
-  updateUser: async (userId, updateData) => {
-    const currentData = await getData();
+  updateUser: (userId, updates) => {
+    const currentData = getData();
 
     if (!currentData.users) currentData.users = [];
 
@@ -82,15 +74,19 @@ export const authOps = {
       throw new Error('User not found');
     }
 
-    currentData.users[userIndex] = { ...currentData.users[userIndex], ...updateData, updatedAt: new Date().toISOString() };
+    currentData.users[userIndex] = {
+      ...currentData.users[userIndex],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
 
-    await updateData(currentData);
+    updateData(currentData);
     return currentData.users[userIndex];
   },
 
   // Change user password
-  updateUserPassword: async (userId, newPassword) => {
-    const currentData = await getData();
+  updateUserPassword: (userId, newPassword) => {
+    const currentData = getData();
 
     if (!currentData.users) currentData.users = [];
 
@@ -106,7 +102,7 @@ export const authOps = {
       updatedAt: new Date().toISOString()
     };
 
-    await updateData(currentData);
+    updateData(currentData);
     return true;
   }
 };
@@ -114,20 +110,20 @@ export const authOps = {
 // Client management functions
 export const clientOps = {
   // Get all clients
-  getClients: async () => {
-    const data = await getData();
+  getClients: () => {
+    const data = getData();
     return data.clients || [];
   },
 
   // Get client by ID
-  getClientById: async (clientId) => {
-    const data = await getData();
+  getClientById: (clientId) => {
+    const data = getData();
     return data.clients ? data.clients.find(client => client._id === clientId) : null;
   },
 
   // Add new client
-  addClient: async (clientData) => {
-    const currentData = await getData();
+  addClient: (clientData) => {
+    const currentData = getData();
 
     if (!currentData.clients) currentData.clients = [];
 
@@ -139,14 +135,14 @@ export const clientOps = {
     };
 
     currentData.clients.push(newClient);
-    await updateData(currentData);
+    updateData(currentData);
 
     return newClient;
   },
 
   // Update client
-  updateClient: async (clientId, updateData) => {
-    const currentData = await getData();
+  updateClient: (clientId, updates) => {
+    const currentData = getData();
 
     if (!currentData.clients) currentData.clients = [];
 
@@ -158,17 +154,17 @@ export const clientOps = {
 
     currentData.clients[clientIndex] = {
       ...currentData.clients[clientIndex],
-      ...updateData,
+      ...updates,
       updatedAt: new Date().toISOString()
     };
 
-    await updateData(currentData);
+    updateData(currentData);
     return currentData.clients[clientIndex];
   },
 
   // Delete client
-  deleteClient: async (clientId) => {
-    const currentData = await getData();
+  deleteClient: (clientId) => {
+    const currentData = getData();
 
     if (!currentData.clients) return false;
 
@@ -179,7 +175,7 @@ export const clientOps = {
     }
 
     currentData.clients.splice(clientIndex, 1);
-    await updateData(currentData);
+    updateData(currentData);
 
     return true;
   }
@@ -188,14 +184,14 @@ export const clientOps = {
 // Payment management functions
 export const paymentOps = {
   // Get payments for a client
-  getPaymentsByClient: async (clientId) => {
-    const data = await getData();
+  getPaymentsByClient: (clientId) => {
+    const data = getData();
     return data.payments ? data.payments.filter(payment => payment.clientId === clientId) : [];
   },
 
   // Add payment
-  addPayment: async (paymentData) => {
-    const currentData = await getData();
+  addPayment: (paymentData) => {
+    const currentData = getData();
 
     if (!currentData.payments) currentData.payments = [];
 
@@ -206,7 +202,7 @@ export const paymentOps = {
     };
 
     currentData.payments.push(newPayment);
-    await updateData(currentData);
+    updateData(currentData);
 
     return newPayment;
   }
@@ -215,21 +211,21 @@ export const paymentOps = {
 // Settings management
 export const settingsOps = {
   // Get settings
-  getSettings: async () => {
-    const data = await getData();
+  getSettings: () => {
+    const data = getData();
     return data.settings || {};
   },
 
   // Update settings
-  updateSettings: async (updateData) => {
-    const currentData = await getData();
+  updateSettings: (updates) => {
+    const currentData = getData();
 
     currentData.settings = {
       ...currentData.settings,
-      ...updateData
+      ...updates
     };
 
-    await updateData(currentData);
+    updateData(currentData);
     return currentData.settings;
   }
 };
