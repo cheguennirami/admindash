@@ -178,62 +178,37 @@ router.put('/change-password', [
   }
 });
 
-// TEMPORARY DEBUG ROUTE - Remove after testing
-// @route   GET /api/auth/debug
-// @desc    Debug database connection and user existence
-// @access  Public (temporary)
-router.get('/debug', async (req, res) => {
+// SIMPLE TEST ROUTES - Remove after testing
+router.get('/test-db', async (req, res) => {
   try {
-    console.log('Testing database connection...');
-
-    // Test connection and get user count
-    const { data: users, error: usersError } = await supabase
+    const { data, error } = await supabase
       .from('users')
-      .select('id, email, role, full_name, is_active')
-      .limit(10);
+      .select('count', { count: 'exact', head: true });
 
-    if (usersError) {
-      console.error('Users query error:', usersError);
-      return res.status(500).json({
-        message: 'Database connection error',
-        error: usersError.message
-      });
-    }
+    if (error) throw error;
 
-    // Check for admin user
-    const { data: adminUser } = await supabase
+    res.json({ success: true, message: 'Database connected', userCount: data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Database error', error: error.message });
+  }
+});
+
+router.get('/check-admin', async (req, res) => {
+  try {
+    const { data, error } = await supabase
       .from('users')
-      .select('id, email, role, full_name, is_active')
+      .select('id, email, role')
       .eq('email', 'admin@sheintoyou.com')
       .single();
 
-    console.log('Users found:', users.length);
-    console.log('Admin user exists:', !!adminUser);
+    if (error && error.code !== 'PGRST116') throw error;
 
     res.json({
-      database_connected: true,
-      user_count: users.length,
-      admin_exists: !!adminUser,
-      admin_details: adminUser ? {
-        id: adminUser.id,
-        email: adminUser.email,
-        role: adminUser.role,
-        active: adminUser.is_active
-      } : null,
-      all_users: users.map(u => ({
-        id: u.id,
-        email: u.email,
-        role: u.role,
-        active: u.is_active
-      }))
+      admin_exists: !!data,
+      admin_data: data ? { id: data.id, email: data.email, role: data.role } : null
     });
-
   } catch (error) {
-    console.error('Debug route error:', error);
-    res.status(500).json({
-      message: 'Debug route error',
-      error: error.message
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
