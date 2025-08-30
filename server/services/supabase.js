@@ -21,59 +21,27 @@ class SupabaseService {
       // Use service role for initialization to bypass RLS
       const serviceSupabase = require('../supabaseClient');
 
-      // Ensure default roles exist
-      const roles = ['super_admin', 'marketing', 'logistics', 'treasurer', 'client'];
-      for (const roleName of roles) {
-        const { data: existingRole } = await serviceSupabase
-          .from('roles')
-          .select('id')
-          .eq('name', roleName)
-          .single();
+      console.log('Default roles are managed as strings in users table');
 
-        if (!existingRole) {
-          const { error: insertRoleError } = await serviceSupabase
-            .from('roles')
-            .insert({ name: roleName });
-
-          if (insertRoleError) {
-            console.error(`Error creating role ${roleName}:`, insertRoleError);
-            throw insertRoleError;
-          }
-        }
-      }
-
-      console.log('Default roles ensured');
-
-      // Create default admin user
+      // Create default admin user with role as string
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@sheintoyou.com';
       const adminExists = await serviceSupabase
         .from('users')
         .select('id')
-        .eq('email', process.env.ADMIN_EMAIL || 'admin@sheintoyou.com')
+        .eq('email', adminEmail)
         .single();
 
       if (adminExists.error && adminExists.error.code === 'PGRST116') {
         const bcrypt = require('bcryptjs');
         const adminPasswordHash = await bcrypt.hash('AdminPassword123!', 12);
 
-        // Get super_admin role id
-        const { data: superRole, error: roleError } = await serviceSupabase
-          .from('roles')
-          .select('id')
-          .eq('name', 'super_admin')
-          .single();
-
-        if (roleError || !superRole) {
-          console.error('Error getting super_admin role:', roleError);
-          throw roleError;
-        }
-
         const { data: adminUser, error } = await serviceSupabase
           .from('users')
           .insert({
             full_name: 'Super Administrator',
-            email: process.env.ADMIN_EMAIL || 'admin@sheintoyou.com',
-            password_hash: adminPasswordHash,
-            role_id: superRole.id,
+            email: adminEmail,
+            password: adminPasswordHash,
+            role: 'super_admin',
             is_active: true
           })
           .select()
