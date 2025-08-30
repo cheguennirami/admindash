@@ -10,7 +10,6 @@ const DEFAULT_DATA = {
       "email": "admin@sheintoyou.com",
       "password": "AdminPassword123!",
       "role": "super_admin",
-      "is_active": true,
       "avatar": "",
       "phone": "",
       "createdAt": new Date().toISOString(),
@@ -104,6 +103,63 @@ export const authOps = {
 
     updateData(currentData);
     return true;
+  },
+
+  // Create new user
+  createUser: (userData) => {
+    const currentData = getData();
+
+    if (!currentData.users) currentData.users = [];
+
+    // Check if email already exists
+    const existingUser = currentData.users.find(user => user.email === userData.email);
+    if (existingUser) {
+      throw new Error('User with this email already exists');
+    }
+
+    const newUser = {
+      _id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      ...userData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    currentData.users.push(newUser);
+    updateData(currentData);
+
+    return newUser;
+  },
+
+  // Delete user by ID
+  deleteUser: (userId) => {
+    const currentData = getData();
+
+    if (!currentData.users) return false;
+
+    const userIndex = currentData.users.findIndex(user => user._id === userId);
+
+    if (userIndex === -1) {
+      throw new Error('User not found');
+    }
+
+    // Prevent deleting the last super admin
+    const superAdmins = currentData.users.filter(user => user.role === 'super_admin');
+    const userToDelete = currentData.users[userIndex];
+
+    if (userToDelete.role === 'super_admin' && superAdmins.length <= 1) {
+      throw new Error('Cannot delete the last super administrator');
+    }
+
+    currentData.users.splice(userIndex, 1);
+    updateData(currentData);
+
+    return true;
+  },
+
+  // Get all users
+  getUsers: () => {
+    const data = getData();
+    return data.users || [];
   }
 };
 

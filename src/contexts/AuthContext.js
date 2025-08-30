@@ -71,10 +71,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid email or password');
       }
 
-      // Check if user is active
-      if (!userData.is_active) {
-        throw new Error('Account is deactivated');
-      }
 
       // Generate token
       const tokenData = {
