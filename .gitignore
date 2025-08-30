@@ -11,6 +11,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Exception for Server .env
+!server/.env
+
 # Production builds
 /client/build
 /server/dist
