@@ -5,8 +5,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
-// Import Supabase service AFTER environment variables are loaded
-const supabase = require('./services/supabase');
+// Import JSONBin service AFTER environment variables are loaded
+const jsonbin = require('./services/jsonbin');
 
 
 
@@ -76,14 +76,14 @@ app.get('*', (req, res) => {
   }
 });
 
-// Initialize Supabase database
+// Initialize JSONBin database
 const initializeDatabase = async () => {
   try {
-    await supabase.initializeDatabase();
-    console.log('Connected to Supabase');
+    await jsonbin.initializeDatabase();
+    console.log('Connected to JSONBin');
   } catch (error) {
-    console.error('Supabase connection error:', error);
-    console.log('Please check your SUPABASE_URL and SUPABASE_ANON_KEY in .env file');
+    console.error('JSONBin connection error:', error);
+    console.log('Please check your JSONBIN_API_KEY and JSONBIN_BIN_ID in .env file');
   }
 };
 
