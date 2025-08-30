@@ -100,5 +100,3 @@ class TableWrapper {
 
 const jsonBinInstance = new JSONBinWrapper();
 module.exports = jsonBinInstance;
-
-module.exports = supabase;
