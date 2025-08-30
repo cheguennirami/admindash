@@ -1,0 +1,29 @@
+{
+  "name": "shein-to-you-dashboard",
+  "version": "1.0.0",
+  "description": "Professional dashboard system for Shein TO YOU business management",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "install-deps": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "keywords": [
+    "dashboard",
+    "business",
+    "management",
+    "react",
+    "node"
+  ],
+  "author": "Shein TO YOU",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.1"
+  }
+}
