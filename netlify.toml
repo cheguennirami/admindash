@@ -8,7 +8,7 @@
   # JSONBin Database environment variables
   # Set in Netlify site settings with these values
   REACT_APP_JSONBIN_API_KEY = "$2a$10$Twch63QhrK5EKGmGCrECfOxy0whAiFxFGWcDyOdWoKpuO0cpaIBge"
-  REACT_APP_JSONBIN_BIN_ID = "68b334bdd0ea881f406bf592"
+  REACT_APP_JSONBIN_BIN_ID = "68b36122d0ea881f406c34d5"
 
 # SPA fallback (no API redirects needed for frontend-only app)
 [[redirects]]
