@@ -21,7 +21,7 @@ WORKDIR /app/client
 RUN --mount=type=cache,target=/root/.npm npm ci --production=false
 
 # Build client
-RUN npm run build
+RUN --mount=type=cache,target=/root/.npm npm run build
 
 # Copy client build to server public directory
 RUN mkdir -p ../server/public && cp -r build/* ../server/public/
