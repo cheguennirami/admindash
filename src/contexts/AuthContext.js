@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { dbOps } from '../services/neon';
+import { authOps } from '../services/jsonbin';
 
 const AuthContext = createContext();
 
@@ -58,8 +58,8 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Query user from Neon database
-      const userData = await dbOps.getUserByEmail(email);
+      // Query user from JSONBin database
+      const userData = await authOps.getUserByEmail(email);
 
       if (!userData) {
         throw new Error('Invalid email or password');
@@ -78,13 +78,13 @@ export const AuthProvider = ({ children }) => {
 
       // Generate token
       const tokenData = {
-        id: userData.id,
+        _id: userData._id,
         email: userData.email,
         role: userData.role,
-        fullName: userData.full_name
+        full_name: userData.full_name
       };
 
-      const token = generateToken(userData.id);
+      const token = generateToken(userData._id);
 
       // Store token and user data
       localStorage.setItem('token', token);
@@ -121,8 +121,8 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No user logged in');
       }
 
-      // Update user in Neon database
-      const updatedUser = await dbOps.updateUser(user.id, profileData);
+      // Update user in JSONBin database
+      const updatedUser = await authOps.updateUser(user._id, profileData);
 
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -143,13 +143,13 @@ export const AuthProvider = ({ children }) => {
       }
 
       // First verify current password
-      const currentUser = await dbOps.getUserByEmail(user.email);
+      const currentUser = await authOps.getUserByEmail(user.email);
       if (!currentUser || currentUser.password !== currentPassword) {
         throw new Error('Current password is incorrect');
       }
 
       // Update password in database
-      await dbOps.updateUserPassword(user.id, newPassword);
+      await authOps.updateUserPassword(user._id, newPassword);
 
       toast.success('Password changed successfully');
       return { success: true };

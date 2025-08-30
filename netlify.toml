@@ -5,12 +5,10 @@
 [build.environment]
   NODE_VERSION = "18"
 
-  # Neon Database environment variables
-  # These should be set in your Netlify site settings
-  NEON_HOST = "ep-xxx.us-east-1.neon.tech"
-  NEON_DATABASE = "neondb"
-  NEON_USERNAME = "your_username"
-  NEON_PASSWORD = "your_password"
+  # JSONBin Database environment variables
+  # Set in Netlify site settings with these values
+  REACT_APP_JSONBIN_API_KEY = "$2a$10$Twch63QhrK5EKGmGCrECfOxy0whAiFxFGWcDyOdWoKpuO0cpaIBge"
+  REACT_APP_JSONBIN_BIN_ID = "68b334bdd0ea881f406bf592"
 
 # SPA fallback (no API redirects needed for frontend-only app)
 [[redirects]]
