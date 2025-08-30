@@ -9,8 +9,8 @@ import {
   Eye,
   Download
 } from 'lucide-react';
-import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
+import { clientOps } from '../../services/jsonbin'; // Import local client operations
 import LoadingSpinner from '../common/LoadingSpinner';
 import ClientForm from './ClientForm';
 import ClientDetails from './ClientDetails';
@@ -29,22 +29,40 @@ const ClientList = () => {
 
   useEffect(() => {
     fetchClients();
-  }, [currentPage, searchTerm, statusFilter, confirmationFilter, user?.token]); // Add user.token to dependency array
+  }, [currentPage, searchTerm, statusFilter, confirmationFilter]); // Remove user.token dependency
 
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage,
-        limit: 10,
-        ...(searchTerm && { search: searchTerm }),
-        ...(statusFilter && { status: statusFilter }),
-        ...(confirmationFilter && { confirmation: confirmationFilter })
-      });
+      // Get all clients from local storage
+      let allClients = clientOps.getClients();
 
-      const response = await axios.get(`/api/clients?${params}`);
-      setClients(response.data.clients);
-      setTotalPages(response.data.totalPages);
+      // Apply search filter
+      if (searchTerm) {
+        allClients = allClients.filter(client =>
+          client.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          client.phoneNumber.includes(searchTerm)
+        );
+      }
+
+      // Apply status filter
+      if (statusFilter) {
+        allClients = allClients.filter(client => client.status === statusFilter);
+      }
+
+      // Apply confirmation filter
+      if (confirmationFilter) {
+        allClients = allClients.filter(client => client.confirmation === confirmationFilter);
+      }
+
+      // Apply pagination
+      const startIndex = (currentPage - 1) * 10;
+      const endIndex = startIndex + 10;
+      const paginatedClients = allClients.slice(startIndex, endIndex);
+
+      setClients(paginatedClients);
+      setTotalPages(Math.ceil(allClients.length / 10));
     } catch (error) {
       console.error('Error fetching clients:', error);
       toast.error('Failed to fetch clients');
@@ -59,7 +77,7 @@ const ClientList = () => {
     }
 
     try {
-      await axios.delete(`/api/clients/${clientId}`);
+      clientOps.deleteClient(clientId);
       toast.success('Client deleted successfully');
       fetchClients();
     } catch (error) {

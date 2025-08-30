@@ -1,14 +1,14 @@
 {
   "files": {
     "main.css": "/static/css/main.2322ca61.css",
-    "main.js": "/static/js/main.6e0bd46a.js",
+    "main.js": "/static/js/main.2c1c5377.js",
     "static/media/shein-logo.png": "/static/media/shein-logo.4166e46bc5312384a790.png",
     "index.html": "/index.html",
     "main.2322ca61.css.map": "/static/css/main.2322ca61.css.map",
-    "main.6e0bd46a.js.map": "/static/js/main.6e0bd46a.js.map"
+    "main.2c1c5377.js.map": "/static/js/main.2c1c5377.js.map"
   },
   "entrypoints": [
     "static/css/main.2322ca61.css",
-    "static/js/main.6e0bd46a.js"
+    "static/js/main.2c1c5377.js"
   ]
 }

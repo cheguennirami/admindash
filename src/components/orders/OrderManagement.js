@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
+import { clientOps, paymentOps } from '../../services/jsonbin'; // Import local services
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { Edit } from 'lucide-react';
 
 const OrderManagement = () => {
-  const { token } = useAuth(); // Use useAuth hook to get token
+  const { user } = useAuth(); // Get current user
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,25 +27,34 @@ const OrderManagement = () => {
     try {
       setLoading(true);
       setError('');
-      const config = {
-        headers: {
-          'x-auth-token': token,
-        },
-      };
-      const params = new URLSearchParams({
-        page: currentPage,
-        limit: 10,
-        ...(statusFilter && { status: statusFilter }),
-      });
-      const res = await axios.get(`/api/orders?${params}`, config);
-      setOrders(res.data.orders);
-      setTotalPages(res.data.totalPages);
-      setStatusCounts(res.data.statusCounts.reduce((acc, curr) => {
-        acc[curr._id] = curr.count;
+      // Fetch clients and treat them as orders
+      const clients = clientOps.getClients();
+
+      // Filter by status if needed
+      let filteredClients = clients;
+      if (statusFilter) {
+        filteredClients = clients.filter(client => client.status === statusFilter);
+      }
+
+      // Simple pagination (just in-memory for now)
+      const startIndex = (currentPage - 1) * 10;
+      const endIndex = startIndex + 10;
+      const paginatedClients = filteredClients.slice(startIndex, endIndex);
+
+      setOrders(paginatedClients);
+      setTotalPages(Math.ceil(filteredClients.length / 10));
+
+      // Calculate status counts
+      const statusCount = filteredClients.reduce((acc, client) => {
+        const status = client.status || 'in_progress';
+        acc[status] = (acc[status] || 0) + 1;
         return acc;
-      }, {}));
+      }, {});
+
+      setStatusCounts(statusCount);
+
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch orders.';
+      const errorMessage = err.message || 'Failed to fetch orders.';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -54,22 +63,17 @@ const OrderManagement = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, [currentPage, statusFilter, token]);
+  }, [currentPage, statusFilter]); // Removed token dependency
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setError('');
-      const config = {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': token,
-        },
-      };
-      await axios.put(`/api/orders/${orderId}/status`, { status: newStatus }, config);
+      // Update client status (clients are treated as orders)
+      clientOps.updateClient(orderId, { status: newStatus });
       toast.success('Order status updated successfully');
       fetchOrders(); // Re-fetch orders to update the list
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to update order status.';
+      const errorMessage = err.message || 'Failed to update order status.';
       setError(errorMessage);
       toast.error(errorMessage);
     }
