@@ -10,7 +10,7 @@ const DEFAULT_DATA = {
       "email": "admin@sheintoyou.com",
       "password": "AdminPassword123!",
       "role": "super_admin",
-      "isActive": true,
+      "is_active": true,
       "avatar": "",
       "phone": "",
       "createdAt": new Date().toISOString(),
