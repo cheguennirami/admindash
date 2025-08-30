@@ -147,9 +147,9 @@ router.put('/change-password', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        message: 'Invalid input', 
-        errors: errors.array() 
+      return res.status(400).json({
+        message: 'Invalid input',
+        errors: errors.array()
       });
     }
 
@@ -175,6 +175,65 @@ router.put('/change-password', [
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// TEMPORARY DEBUG ROUTE - Remove after testing
+// @route   GET /api/auth/debug
+// @desc    Debug database connection and user existence
+// @access  Public (temporary)
+router.get('/debug', async (req, res) => {
+  try {
+    console.log('Testing database connection...');
+
+    // Test connection and get user count
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, email, role, full_name, is_active')
+      .limit(10);
+
+    if (usersError) {
+      console.error('Users query error:', usersError);
+      return res.status(500).json({
+        message: 'Database connection error',
+        error: usersError.message
+      });
+    }
+
+    // Check for admin user
+    const { data: adminUser } = await supabase
+      .from('users')
+      .select('id, email, role, full_name, is_active')
+      .eq('email', 'admin@sheintoyou.com')
+      .single();
+
+    console.log('Users found:', users.length);
+    console.log('Admin user exists:', !!adminUser);
+
+    res.json({
+      database_connected: true,
+      user_count: users.length,
+      admin_exists: !!adminUser,
+      admin_details: adminUser ? {
+        id: adminUser.id,
+        email: adminUser.email,
+        role: adminUser.role,
+        active: adminUser.is_active
+      } : null,
+      all_users: users.map(u => ({
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        active: u.is_active
+      }))
+    });
+
+  } catch (error) {
+    console.error('Debug route error:', error);
+    res.status(500).json({
+      message: 'Debug route error',
+      error: error.message
+    });
   }
 });
 
