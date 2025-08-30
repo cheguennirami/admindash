@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const multer = require('multer');
 const { auth, marketingAccess, logisticsAccess } = require('../middleware/auth');
 const supabase = require('../supabaseClient');
+const Client = require('../models/Client');
 
 const router = express.Router();
 
