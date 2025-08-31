@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
+import { authOps } from '../../services/jsonbin-new'; // Import JSONBin auth operations
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
 const Settings = () => {
-  const { user, token, setUser } = useAuth(); // Use useAuth hook to get user, token, and setUser
+  const { user, updateProfile, changePassword } = useAuth(); // Use updateProfile and changePassword functions
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
@@ -34,11 +34,23 @@ const Settings = () => {
     setProfileError('');
 
     try {
-      const res = await axios.put(`/api/auth/profile`, { fullName, email, phone });
-      setUser(res.data); // Update user in context
-      toast.success('Profile updated successfully');
+      const result = await updateProfile({
+        fullName,
+        email,
+        phone
+      });
+
+      if (result.success) {
+        // Profile updated successfully, values will be updated in AuthContext
+        // Clear form values that will be repopulated from updated user
+        setFullName('');
+        setEmail('');
+        setPhone('');
+      } else {
+        setProfileError(result.message);
+      }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to update profile.';
+      const errorMessage = err.message || 'Failed to update profile.';
       setProfileError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -64,16 +76,17 @@ const Settings = () => {
     }
 
     try {
-      const res = await axios.put('/api/auth/change-password', {
-        currentPassword,
-        newPassword
-      });
-      toast.success('Password changed successfully');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmNewPassword('');
+      const result = await changePassword(currentPassword, newPassword);
+
+      if (result.success) {
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmNewPassword('');
+      } else {
+        setPasswordError(result.message);
+      }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to change password.';
+      const errorMessage = err.message || 'Failed to change password.';
       setPasswordError(errorMessage);
       toast.error(errorMessage);
     } finally {

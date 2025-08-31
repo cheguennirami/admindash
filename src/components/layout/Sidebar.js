@@ -101,7 +101,10 @@ const Sidebar = ({ isOpen, onClose, user }) => {
               </div>
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  Welcome back, {user?.fullName} 😊
+                  Welcome back,
+                </p>
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {user?.fullName} 😊
                 </p>
               </div>
             </div>
