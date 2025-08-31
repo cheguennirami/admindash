@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useAuth } from '../../contexts/AuthContext';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import {
@@ -9,13 +7,10 @@ import {
   DollarSign,
   CreditCard,
   FileText,
-  Calendar,
-  Filter,
   RefreshCw
 } from 'lucide-react';
 
 const FinancialReports = () => {
-  const { token } = useAuth();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({});
   const [dateRange, setDateRange] = useState('month');
@@ -26,33 +21,22 @@ const FinancialReports = () => {
     fetchReports();
   }, [dateRange, customStartDate, customEndDate]);
 
-  const fetchReports = async () => {
+  const fetchReports = () => {
     try {
       setLoading(true);
-      const config = {
-        headers: {
-          'x-auth-token': token,
-        },
-        params: {
-          period: dateRange,
-          ...(dateRange === 'custom' && { startDate: customStartDate, endDate: customEndDate })
-        }
-      };
-
-      const response = await axios.get('/api/payments/reports', config);
-      setData(response.data);
-    } catch (error) {
-      console.error('Error fetching reports:', error);
-      toast.error('Failed to load financial reports');
-      // Set default empty data structure
+      // TODO: Implement actual report fetching from contexts/services
+      // For now, set empty data structure
       setData({
         summary: { totalIncome: 0, totalExpenses: 0, netProfit: 0 },
         monthlyTrends: [],
         categoryBreakdown: [],
         paymentMethods: [],
         clientPayments: [],
-        overduePayments: []
+        overduePayments: [],
+        recentTransactions: []
       });
+    } catch (error) {
+      console.error('Error fetching reports:', error);
     } finally {
       setLoading(false);
     }
@@ -60,33 +44,13 @@ const FinancialReports = () => {
 
   const exportReport = async (format = 'pdf') => {
     try {
-      const config = {
-        headers: {
-          'x-auth-token': token,
-        },
-        params: {
-          format,
-          period: dateRange,
-          ...(dateRange === 'custom' && { startDate: customStartDate, endDate: customEndDate })
-        },
-        responseType: 'blob'
-      };
-
-      const response = await axios.get('/api/payments/export', config);
-
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `financial-report-${new Date().toISOString().split('T')[0]}.${format}`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      toast.success('Report exported successfully');
+      // TODO: Implement actual export functionality
+      // For now, just show message
+      console.log(`Export format: ${format}, period: ${dateRange}`);
+      toast.success('Export functionality coming soon!');
     } catch (error) {
       console.error('Error exporting report:', error);
-      toast.error('Failed to export report');
+      toast.error('Export failed');
     }
   };
 

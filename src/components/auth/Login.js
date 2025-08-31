@@ -44,6 +44,10 @@ const Login = () => {
             </p>
           </div>
 
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+            <p className="text-center">Please enter your email and password to continue</p>
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Email Field */}
             <div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ShoppingCart, 
-  DollarSign, 
+import {
+  ShoppingCart,
+  DollarSign,
   TrendingUp,
   Users,
   Plus,
@@ -9,8 +9,8 @@ import {
   BarChart3
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
+import { clientOps, paymentOps } from '../../services/jsonbin-new';
 import StatsCard from '../common/StatsCard';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -27,15 +27,61 @@ const MarketingDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsResponse, clientsResponse] = await Promise.all([
-        axios.get('/dashboard/stats'),
-        axios.get('/dashboard/recent-clients?limit=5')
-      ]);
-      
-      setStats(statsResponse.data);
-      setRecentClients(clientsResponse.data);
+      console.log('📥 Loading marketing dashboard data from JSONBin...');
+
+      // Get clients data from JSONBin
+      const clients = await clientOps.getClients();
+      const payments = await paymentOps.getPayments();
+
+      console.log(`✅ Loaded ${clients.length} clients from JSONBin`);
+
+      // Calculate stats
+      const totalClients = clients.length;
+      const totalRevenue = payments
+        .filter(p => p.type === 'income')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+      const totalProfit = totalRevenue - payments
+        .filter(p => p.type === 'expense')
+        .reduce((sum, p) => sum + (p.amount || 0), 0);
+      const confirmedOrders = clients.filter(c => c.confirmation === 'confirmed').length;
+
+      setStats({
+        totalClients,
+        totalOrders: confirmedOrders,
+        revenue: {
+          totalRevenue,
+          totalProfit,
+          totalCost: totalRevenue - totalProfit
+        },
+        orderStatusBreakdown: [
+          { _id: 'in_progress', count: clients.filter(c => c.status === 'in_progress').length },
+          { _id: 'confirmed', count: clients.filter(c => c.confirmation === 'confirmed').length },
+          { _id: 'bought', count: clients.filter(c => c.status === 'bought').length },
+          { _id: 'delivered_to_client', count: clients.filter(c => c.status === 'delivered_to_client').length }
+        ].filter(status => status.count > 0),
+        monthlyRevenue: [] // Can be enhanced later for real monthly data
+      });
+
+      // Set recent clients (most recent 5)
+      setRecentClients(clients
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 5)
+      );
+
+      console.log(`✅ Marketing dashboard loaded with ${totalClients} clients`);
+
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
+
+      // Set default empty data
+      setStats({
+        totalClients: 0,
+        totalOrders: 0,
+        revenue: { totalRevenue: 0, totalProfit: 0, totalCost: 0 },
+        orderStatusBreakdown: [],
+        monthlyRevenue: []
+      });
+      setRecentClients([]);
     } finally {
       setLoading(false);
     }
@@ -50,7 +96,6 @@ const MarketingDashboard = () => {
   }
 
   const totalRevenue = stats?.revenue?.totalRevenue || 0;
-  const totalCost = stats?.revenue?.totalCost || 0;
   const totalProfit = stats?.revenue?.totalProfit || 0;
   const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
 

@@ -1,26 +1,114 @@
-// Local JSON Storage Service (JSONBin alternative for deactivated accounts)
+// 🎯 Complete JSONBin Service - Final Version
 const STORAGE_KEY = 'shein_dashboard_data';
+const JSONBIN_BASE_URL = 'https://api.jsonbin.io/v3/b';
 
-// Default data structure
-const DEFAULT_DATA = {
-  "users": [
-    {
-      "_id": "admin-001",
-      "full_name": "Super Administrator",
-      "email": "admin@sheintoyou.com",
-      "password": "AdminPassword123!",
-      "role": "super_admin",
-      "avatar": "",
-      "phone": "",
-      "createdAt": new Date().toISOString(),
-      "updatedAt": new Date().toISOString()
+// Environment variables
+const JSONBIN_API_KEY = process.env.REACT_APP_JSONBIN_API_KEY;
+const JSONBIN_BIN_ID = process.env.REACT_APP_JSONBIN_BIN_ID;
+
+
+// 🌐 JSONBin API Operations
+const jsonbinAPI = {
+  async get() {
+    try {
+      const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
+        headers: {
+          'X-Master-Key': JSONBIN_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.ok ? await response.json() : null;
+    } catch {
+      return null;
     }
-  ],
-  "clients": [],
-  "payments": [],
-  "settings": {
-    "initialized": true,
-    "version": "1.0.0"
+  },
+
+  async put(data) {
+    try {
+      const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
+        method: 'PUT',
+        headers: {
+          'X-Master-Key': JSONBIN_API_KEY,
+          'Content-Type': 'application/json',
+          'X-Bin-Versioning': 'false'
+        },
+        body: JSON.stringify(data)
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+};
+
+const getEmptyData = () => ({
+  users: [],
+  clients: [],
+  payments: [],
+  settings: {
+    initialized: true,
+    version: "3.0.0"
+  }
+});
+
+// 🏠 Local Storage Operations
+const localStorageOps = {
+  get() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY);
+      return data ? JSON.parse(data) : getEmptyData();
+    } catch {
+      return getEmptyData();
+    }
+  },
+
+  set(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  init() {
+    const data = this.get();
+    this.set(data);
+    return data;
+  }
+};
+
+// 🎯 Main Data Manager
+export const dataManager = {
+  async loadData() {
+    console.log('📥 Loading application data...');
+
+    if (JSONBIN_API_KEY && JSONBIN_BIN_ID) {
+      const remoteData = await jsonbinAPI.get();
+      if (remoteData?.record) {
+        console.log('✅ Data loaded from JSONBin');
+        localStorageOps.set(remoteData.record); // Sync to local
+        return remoteData.record;
+      }
+    }
+
+    console.log('📋 Using localStorage data');
+    return localStorageOps.get();
+  },
+
+  async saveData(data) {
+    localStorageOps.set(data);
+
+    if (JSONBIN_API_KEY && JSONBIN_BIN_ID) {
+      const success = await jsonbinAPI.put(data);
+      if (success) {
+        console.log('✅ Data synced to JSONBin');
+      } else {
+        console.warn('⚠️ JSONBin sync failed, data saved locally only');
+      }
+    }
+
+    return data;
   }
 };
 
@@ -31,15 +119,13 @@ const getData = () => {
     if (stored) {
       return JSON.parse(stored);
     } else {
-      // Initialize with default data
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DATA));
-      return DEFAULT_DATA;
+      // Return empty data structure
+      return getEmptyData();
     }
   } catch (error) {
     console.error('Error reading local data:', error);
-    // Fallback to default data
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DATA));
-    return DEFAULT_DATA;
+    // Fallback to empty data
+    return getEmptyData();
   }
 };
 

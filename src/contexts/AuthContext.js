@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { authOps } from '../services/jsonbin';
+import { authOps } from '../services/jsonbin-new';
 
 const AuthContext = createContext();
 

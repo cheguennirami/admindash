@@ -43,6 +43,12 @@ const Sidebar = ({ isOpen, onClose, user }) => {
       roles: ['super_admin', 'logistics']
     },
     {
+      name: 'France Logistics',
+      href: '/dashboard/logistics',
+      icon: Truck,
+      roles: ['super_admin', 'logistics']
+    },
+    {
       name: 'Payments',
       href: '/dashboard/payments',
       icon: DollarSign,

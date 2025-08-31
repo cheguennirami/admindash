@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Filter,
+import {
+  Plus,
+  Search,
   Edit,
   Trash2,
   Eye,
   Download
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
-import { clientOps } from '../../services/jsonbin'; // Import local client operations
+import { clientOps } from '../../services/jsonbin-new'; // Import JSONBin client operations
 import LoadingSpinner from '../common/LoadingSpinner';
 import ClientForm from './ClientForm';
 import ClientDetails from './ClientDetails';
@@ -27,15 +26,14 @@ const ClientList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    fetchClients();
-  }, [currentPage, searchTerm, statusFilter, confirmationFilter]); // Remove user.token dependency
-
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       setLoading(true);
-      // Get all clients from local storage
-      let allClients = clientOps.getClients();
+      console.log('📥 Fetching clients from JSONBin...');
+
+      // Get all clients from JSONBin
+      let allClients = await clientOps.getClients();
+      console.log(`✅ Fetched ${allClients.length} clients from JSONBin`);
 
       // Apply search filter
       if (searchTerm) {
@@ -44,16 +42,19 @@ const ClientList = () => {
           client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
           client.phoneNumber.includes(searchTerm)
         );
+        console.log(`🔍 Filtered clients by search term:`, allClients.length);
       }
 
       // Apply status filter
       if (statusFilter) {
         allClients = allClients.filter(client => client.status === statusFilter);
+        console.log(`🎯 Filtered clients by status:`, allClients.length);
       }
 
       // Apply confirmation filter
       if (confirmationFilter) {
         allClients = allClients.filter(client => client.confirmation === confirmationFilter);
+        console.log(`✅ Filtered clients by confirmation:`, allClients.length);
       }
 
       // Apply pagination
@@ -63,13 +64,19 @@ const ClientList = () => {
 
       setClients(paginatedClients);
       setTotalPages(Math.ceil(allClients.length / 10));
+
+      console.log(`📄 Showing page ${currentPage} with ${paginatedClients.length} clients`);
     } catch (error) {
-      console.error('Error fetching clients:', error);
+      console.error('❌ Error fetching clients:', error);
       toast.error('Failed to fetch clients');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, searchTerm, statusFilter, confirmationFilter]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
 
   const handleDelete = async (clientId) => {
     if (!window.confirm('Are you sure you want to delete this client?')) {
@@ -77,11 +84,13 @@ const ClientList = () => {
     }
 
     try {
-      clientOps.deleteClient(clientId);
+      console.log('🗑️ Deleting client:', clientId);
+      await clientOps.deleteClient(clientId);
       toast.success('Client deleted successfully');
-      fetchClients();
+      console.log('✅ Client deleted from JSONBin');
+      await fetchClients(); // Refresh the list
     } catch (error) {
-      console.error('Error deleting client:', error);
+      console.error('❌ Error deleting client:', error);
       toast.error('Failed to delete client');
     }
   };

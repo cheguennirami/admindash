@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AddUserModal from './AddUserModal';
 import EditUserModal from './EditUserModal';
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
-import { authOps } from '../../services/jsonbin'; // Import local user operations
+import { authOps } from '../../services/jsonbin-new'; // Import JSONBin operations
 import LoadingSpinner from '../common/LoadingSpinner';
 
 const UserManagement = () => {
@@ -18,11 +18,13 @@ const UserManagement = () => {
     try {
       setLoading(true);
       setError('');
-      const usersList = authOps.getUsers();
+      const usersList = await authOps.getUsers();
       setUsers(usersList);
+      console.log('✅ Fetched', usersList.length, 'users from JSONBin');
     } catch (err) {
       const errorMessage = err.message || 'Failed to fetch users.';
       setError(errorMessage);
+      console.error('❌ Failed to fetch users:', err);
     } finally {
       setLoading(false);
     }
@@ -34,32 +36,30 @@ const UserManagement = () => {
 
   const handleAddUser = async (userData) => {
     try {
-      setLoading(true);
       setError('');
-      const newUser = authOps.createUser(userData);
+      const newUser = await authOps.createUser(userData);
       setUsers((prevUsers) => [...prevUsers, newUser]);
-      setLoading(false);
+      console.log('✅ User added to JSONBin:', newUser.full_name);
       return Promise.resolve();
     } catch (err) {
       const errorMessage = err.message || 'Failed to add user.';
       setError(errorMessage);
-      setLoading(false);
+      console.error('❌ Failed to add user:', err);
       return Promise.reject(new Error(errorMessage));
     }
   };
 
   const handleEditUser = async (id, userData) => {
     try {
-      setLoading(true);
       setError('');
-      const updatedUser = authOps.updateUser(id, userData);
+      const updatedUser = await authOps.updateUser(id, userData);
       setUsers((prevUsers) => prevUsers.map((user) => (user._id === id ? updatedUser : user)));
-      setLoading(false);
+      console.log('✅ User updated in JSONBin:', updatedUser.full_name);
       return Promise.resolve();
     } catch (err) {
       const errorMessage = err.message || 'Failed to update user.';
       setError(errorMessage);
-      setLoading(false);
+      console.error('❌ Failed to update user:', err);
       return Promise.reject(new Error(errorMessage));
     }
   };
@@ -73,15 +73,14 @@ const UserManagement = () => {
 
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        setLoading(true);
         setError('');
-        authOps.deleteUser(id);
+        await authOps.deleteUser(id);
         setUsers((prevUsers) => prevUsers.filter((user) => user._id !== id));
-        setLoading(false);
+        console.log('✅ User deleted from JSONBin:', id);
       } catch (err) {
         const errorMessage = err.message || 'Failed to delete user.';
         setError(errorMessage);
-        setLoading(false);
+        console.error('❌ Failed to delete user:', err);
       }
     }
   };

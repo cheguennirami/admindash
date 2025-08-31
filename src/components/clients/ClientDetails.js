@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Edit, Phone, MapPin, Calendar, DollarSign } from 'lucide-react';
-import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
+import { clientOps } from '../../services/jsonbin-new';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -13,27 +13,33 @@ const ClientDetails = () => {
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchClient();
-  }, [id]);
-
-  const fetchClient = async () => {
+  const fetchClient = useCallback(async () => {
     try {
-      const config = {
-        headers: {
-          'x-auth-token': user.token, // Assuming user object contains token
-        },
-      };
-      const response = await axios.get(`/api/clients/${id}`, config);
-      setClient(response.data);
+      console.log('📥 Fetching client details from JSONBin:', id);
+      // Get all clients and find the specific one by ID
+      const clients = await clientOps.getClients();
+      const foundClient = clients.find(client => client._id === id);
+
+      if (foundClient) {
+        setClient(foundClient);
+        console.log('✅ Client found in JSONBin:', foundClient.full_name);
+      } else {
+        console.error('❌ Client not found:', id);
+        toast.error('Client not found');
+        navigate('/dashboard/clients');
+      }
     } catch (error) {
-      console.error('Error fetching client:', error);
+      console.error('❌ Error fetching client:', error);
       toast.error('Failed to fetch client details');
       navigate('/dashboard/clients');
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    fetchClient();
+  }, [id, fetchClient]);
 
   if (loading) {
     return (

@@ -44,19 +44,15 @@ A comprehensive web application for managing a Shein reselling business with rol
 ## 🛠️ Technology Stack
 
 ### Backend
-- **Node.js** with Express.js
-- **MongoDB** with Mongoose ODM
-- **JWT** for authentication
-- **Multer** for file uploads
-- **Bcrypt** for password hashing
-- **Helmet** for security
-- **CORS** for cross-origin requests
+- **JSONBin.io** for data storage
+- Simple API calls to JSONBin.io
+- Local storage fallback for offline functionality
 
 ### Frontend
 - **React 18** with functional components
 - **React Router** for navigation
 - **Tailwind CSS** for styling
-- **Axios** for API calls
+- **Fetch API** for JSONBin calls
 - **React Hook Form** for form handling
 - **React Hot Toast** for notifications
 - **Lucide React** for icons
@@ -66,27 +62,29 @@ A comprehensive web application for managing a Shein reselling business with rol
 
 ```
 shein-to-you-dashboard/
-├── server/                 # Backend API
-│   ├── models/            # Database models
-│   ├── routes/            # API routes
-│   ├── middleware/        # Authentication & authorization
-│   ├── utils/             # Utility functions
-│   └── index.js           # Server entry point
-├── client/                # Frontend React app
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── contexts/      # React contexts
-│   │   └── App.js         # Main app component
-│   └── public/            # Static assets
-└── package.json           # Root package.json
+├── public/                # Static assets and HTML entry point
+├── src/                   # Main source code directory
+│   ├── assets/            # Images and static assets
+│   ├── components/        # React components organized by feature
+│   │   ├── auth/          # Authentication components
+│   │   ├── common/        # Shared UI components
+│   │   ├── dashboard/     # Dashboard components
+│   │   └── layout/        # Layout components
+│   ├── contexts/          # React context providers
+│   │   └── SimpleAuthContext.js  # Authentication context
+│   ├── services/          # API and data services
+│   │   └── jsonbin-simple.js     # JSONBin service
+│   ├── App.js             # Main application component
+│   └── index.js           # Entry point
+└── package.json           # Project dependencies and scripts
 ```
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- MongoDB (local or cloud)
+- Node.js (v14 or higher)
 - npm or yarn
+- JSONBin.io account
 
 ### Installation
 
@@ -98,34 +96,29 @@ shein-to-you-dashboard/
 
 2. **Install dependencies**
    ```bash
-   npm run install-deps
+   npm install
    ```
 
 3. **Environment Setup**
    
-   Create `.env` file in the `server` directory:
+   Create `.env` file in the root directory:
    ```env
-   NODE_ENV=development
-   PORT=5000
-   MONGODB_URI=mongodb://localhost:27017/shein-to-you
-   JWT_SECRET=your-super-secret-jwt-key-here-make-it-long-and-random
-   JWT_EXPIRE=7d
-   
-   # Admin credentials (for initial setup)
-   ADMIN_EMAIL=admin@sheintoyou.com
-   ADMIN_PASSWORD=AdminPassword123!
+   REACT_APP_JSONBIN_API_KEY=your_jsonbin_api_key
+   REACT_APP_JSONBIN_BIN_ID=your_jsonbin_bin_id
    ```
 
 4. **Start the application**
    ```bash
-   npm run dev
+   npm start
    ```
 
-   This will start both the backend server (port 5000) and frontend development server (port 3000).
+   This will start the development server on port 3000.
 
-### Default Admin Account
-- **Email:** admin@sheintoyou.com
-- **Password:** AdminPassword123!
+### Demo Accounts
+- **Admin:** admin@sheintoyou.com / admin123
+- **Marketing:** marketing@sheintoyou.com / marketing123
+- **Logistics:** logistics@sheintoyou.com / logistics123
+- **Treasurer:** treasurer@sheintoyou.com / treasurer123
 
 ## 👥 User Roles & Permissions
 
@@ -170,13 +163,11 @@ shein-to-you-dashboard/
 
 ## 🔒 Security Features
 
-- JWT token authentication
-- Password hashing with bcrypt
-- Rate limiting
-- CORS protection
-- Helmet security headers
-- Input validation
+- Simple authentication with email/password
+- Local storage for user session
+- Input validation with React Hook Form
 - Role-based access control
+- JSONBin.io API key protection
 
 ## 📱 Mobile Compatibility
 
@@ -188,21 +179,19 @@ The application is fully responsive and works seamlessly on:
 
 ## 🚀 Deployment
 
-### Frontend (Netlify)
+### Netlify Deployment
 1. Build the React app:
    ```bash
-   cd client && npm run build
+   npm run build
    ```
 
 2. Deploy the `build` folder to Netlify
 
 3. Configure environment variables in Netlify:
-   - `REACT_APP_API_URL`: Your backend API URL
+   - `REACT_APP_JSONBIN_API_KEY`: Your JSONBin API key
+   - `REACT_APP_JSONBIN_BIN_ID`: Your JSONBin bin ID
 
-### Backend (Heroku/Railway/DigitalOcean)
-1. Set up environment variables
-2. Configure MongoDB connection
-3. Deploy the `server` directory
+For detailed deployment instructions, see [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md)
 
 ## 🤝 Contributing
 

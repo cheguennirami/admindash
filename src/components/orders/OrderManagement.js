@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
-import { clientOps, paymentOps } from '../../services/jsonbin'; // Import local services
+import React, { useState, useEffect, useCallback } from 'react';
+import { clientOps } from '../../services/jsonbin'; // Import local services
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { Edit } from 'lucide-react';
 
 const OrderManagement = () => {
-  const { user } = useAuth(); // Get current user
+  // Remove unused user variable
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,7 +21,7 @@ const OrderManagement = () => {
     'delivered_to_client',
   ];
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -59,11 +57,11 @@ const OrderManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, statusFilter]);
 
   useEffect(() => {
     fetchOrders();
-  }, [currentPage, statusFilter]); // Removed token dependency
+  }, [fetchOrders]);
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {

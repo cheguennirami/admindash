@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Upload, X, Save } from 'lucide-react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../common/LoadingSpinner';
-import { useAuth } from '../../contexts/AuthContext'; // Import useAuth
+import { clientOps } from '../../services/jsonbin-new'; // Import JSONBin client operations
 
 const ClientForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
-  const { user } = useAuth(); // Get user (and token) from AuthContext
+  // Remove unused user variable
   
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEdit);
@@ -20,33 +19,43 @@ const ClientForm = () => {
   
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm();
 
-  useEffect(() => {
-    if (isEdit) {
-      fetchClient();
-    }
-  }, [id, isEdit, user?.token]); // Add user.token to dependency array
-
-  const fetchClient = async () => {
+  const fetchClient = useCallback(async () => {
     try {
-      const response = await axios.get(`/api/clients/${id}`);
-      const client = response.data;
-      
-      // Set form values
-      Object.keys(client).forEach(key => {
-        if (key !== 'screenshots') {
-          setValue(key, client[key]);
-        }
-      });
-      
-      setExistingScreenshots(client.screenshots || []);
+      console.log('📥 Fetching client from JSONBin:', id);
+
+      // Get all clients and find the specific one
+      const clients = await clientOps.getClients();
+      const client = clients.find(c => c._id === id);
+
+      if (client) {
+        console.log('✅ Client found in JSONBin:', client.full_name);
+        // Set form values
+        Object.keys(client).forEach(key => {
+          if (key !== 'screenshots') {
+            setValue(key, client[key]);
+          }
+        });
+
+        setExistingScreenshots(client.screenshots || []);
+      } else {
+        console.error('❌ Client not found:', id);
+        toast.error('Client not found');
+        navigate('/dashboard/clients');
+      }
     } catch (error) {
-      console.error('Error fetching client:', error);
+      console.error('❌ Error fetching client:', error);
       toast.error('Failed to fetch client data');
       navigate('/dashboard/clients');
     } finally {
       setInitialLoading(false);
     }
-  };
+  }, [id, setValue, navigate]);
+
+  useEffect(() => {
+    if (isEdit) {
+      fetchClient();
+    }
+  }, [isEdit, fetchClient]);
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
@@ -80,46 +89,36 @@ const ClientForm = () => {
   const onSubmit = async (data) => {
     try {
       setLoading(true);
-      
-      const formData = new FormData();
-      
-      // Append form fields
-      Object.keys(data).forEach(key => {
-        if (data[key] !== undefined && data[key] !== '') {
-          formData.append(key, data[key]);
-        }
-      });
-      
-      // Append new screenshots
-      screenshots.forEach(screenshot => {
-        formData.append('screenshots', screenshot.file);
-      });
+      console.log(`${isEdit ? '📝' : '🆕'} Saving client to JSONBin...`);
 
-      // For FormData, we need to explicitly set the Authorization header
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        }
+      // Prepare client data for JSONBin
+      const clientData = {
+        ...data,
+        // Add additional fields that might be missing
+        advanceAmount: data.sellingPrice * 0.3,
+        remainingAmount: data.sellingPrice * 0.7,
+        advancePaid: data.advancePaid || false,
+        remainingPaid: data.remainingPaid || false,
+        // For now, we'll skip screenshots in database
+        screenshots: [],
+        confirmation: data.confirmation || 'pending',
+        status: data.status || 'in_progress'
       };
 
-      // Let the axios interceptor handle authentication, but for FormData,
-      // we might need to add the token if the interceptor doesn't work properly
-      if (user?.token) {
-        config.headers.Authorization = `Bearer ${user.token}`;
-      }
-
-      let response;
       if (isEdit) {
-        response = await axios.put(`/api/clients/${id}`, formData, config);
+        await clientOps.updateClient(id, clientData);
+        toast.success('Client updated successfully');
+        console.log('✅ Client updated in JSONBin:', id);
       } else {
-        response = await axios.post('/api/clients', formData, config);
+        const newClient = await clientOps.createClient(clientData);
+        toast.success('Client created successfully');
+        console.log('✅ Client created in JSONBin:', newClient._id);
       }
 
-      toast.success(`Client ${isEdit ? 'updated' : 'created'} successfully`);
       navigate('/dashboard/clients');
     } catch (error) {
-      console.error('Error saving client:', error);
-      const message = error.response?.data?.message || `Failed to ${isEdit ? 'update' : 'create'} client`;
+      console.error('❌ Error saving client:', error);
+      const message = error.message || `Failed to ${isEdit ? 'update' : 'create'} client`;
       toast.error(message);
     } finally {
       setLoading(false);

@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  DollarSign, 
+import {
+  DollarSign,
   TrendingUp,
   TrendingDown,
   CreditCard,
-  PieChart,
   Plus,
   Eye,
   Calculator
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
+import { paymentOps } from '../../services/jsonbin-new';
 import StatsCard from '../common/StatsCard';
 import LoadingSpinner from '../common/LoadingSpinner';
-import { PieChart as RechartsPieChart, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import ExpenseForm from '../payments/ExpenseForm';
+import { Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, LineChart, Line, Legend } from 'recharts';
 
 const TreasurerDashboard = () => {
   const { user } = useAuth();
@@ -28,15 +28,48 @@ const TreasurerDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsResponse, paymentsResponse] = await Promise.all([
-        axios.get('/dashboard/stats'),
-        axios.get('/payments?limit=10')
-      ]);
-      
-      setStats(statsResponse.data);
-      setPayments(paymentsResponse.data.payments || []);
+      console.log('📥 Loading treasurer dashboard data from JSONBin...');
+      // Get payments data from JSONBin
+      const payments = await paymentOps.getPayments();
+      console.log(`✅ Loaded ${payments.length} transactions from JSONBin`);
+
+      // Calculate summary stats
+      const income = payments.filter(p => p.type === 'income').reduce((sum, p) => sum + (p.amount || 0), 0);
+      const expenses = payments.filter(p => p.type === 'expense').reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      // Calculate monthly net profit
+      const monthlyNet = payments.reduce((acc, payment) => {
+        const date = new Date(payment.createdAt);
+        const month = date.getMonth() + 1;
+        const year = date.getFullYear();
+        const key = `${year}-${month}`;
+        if (!acc[key]) acc[key] = { _id: { month, year }, net: 0 };
+        acc[key].net += payment.type === 'income' ? payment.amount : -payment.amount;
+        return acc;
+      }, {});
+      const monthlyPayments = Object.values(monthlyNet).sort((a, b) => a._id.year * 12 + a._id.month - b._id.year * 12 - b._id.month);
+
+      setStats({
+        payments: [
+          { _id: 'income', total: income },
+          { _id: 'expense', total: expenses },
+          { _id: 'profit', total: income - expenses }
+        ],
+        monthlyPayments
+      });
+
+      setPayments(payments.slice(0, 10)); // Show first 10 payments
+
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
+      // Set default empty data
+      setStats({
+        payments: [
+          { _id: 'income', total: 0 },
+          { _id: 'expense', total: 0 }
+        ]
+      });
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -61,12 +94,18 @@ const TreasurerDashboard = () => {
   const paymentSummary = getPaymentSummary();
   const netIncome = paymentSummary.income - paymentSummary.expense;
 
-  const pieData = [
-    { name: 'Income', value: paymentSummary.income, color: '#10b981' },
-    { name: 'Expenses', value: paymentSummary.expense, color: '#ef4444' }
-  ];
+  // Category breakdown pie data
+  const categoryData = payments.filter(p => p.type === 'expense').reduce((acc, payment) => {
+    const existing = acc.find(item => item.name === payment.category);
+    if (existing) {
+      existing.value += payment.amount;
+    } else {
+      acc.push({ name: payment.category, value: payment.amount });
+    }
+    return acc;
+  }, []);
 
-  const COLORS = ['#10b981', '#ef4444'];
+  const COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6'];
 
   return (
     <div className="space-y-6">
@@ -128,67 +167,74 @@ const TreasurerDashboard = () => {
 
       {/* Financial Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Income vs Expenses Chart */}
+        {/* Income vs Expenses Bar Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Income vs Expenses</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <RechartsPieChart>
-                <RechartsPieChart
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </RechartsPieChart>
-                <Tooltip formatter={(value) => `${value.toLocaleString()} TND`} />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center space-x-6 mt-4">
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-sm text-gray-600">Income</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-              <span className="text-sm text-gray-600">Expenses</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Monthly Trends */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Trends</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats?.monthlyPayments || []}>
+              <BarChart data={[{ name: 'Summary', Income: paymentSummary.income, Expenses: paymentSummary.expense }]}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="_id.month"
-                  tickFormatter={(month) => {
-                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                    return months[month - 1];
-                  }}
-                />
+                <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip 
-                  formatter={(value) => `${value.toLocaleString()} TND`}
-                  labelFormatter={(month) => {
-                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                    return months[month - 1];
-                  }}
-                />
-                <Bar dataKey="total" fill="#3b82f6" />
+                <Tooltip formatter={(value) => `${value.toLocaleString()} TND`} />
+                <Bar dataKey="Income" fill="#10b981" />
+                <Bar dataKey="Expenses" fill="#ef4444" />
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+
+        {/* Payment Category Breakdown */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Category Breakdown</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  dataKey="value"
+                  label
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => `${value.toLocaleString()} TND`} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Monthly Net Profit Trend */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Net Profit Trend</h3>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={stats?.monthlyPayments || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="_id.month"
+                tickFormatter={(month) => {
+                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  return months[month - 1];
+                }}
+              />
+              <YAxis />
+              <Tooltip
+                formatter={(value) => `${value.toLocaleString()} TND`}
+                labelFormatter={(month) => {
+                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  return months[month - 1];
+                }}
+              />
+              <Line type="monotone" dataKey="net" stroke="#3b82f6" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
@@ -255,6 +301,24 @@ const TreasurerDashboard = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Add Transaction Form */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          {/* Financial Overview Chart - can be moved here if needed */}
+        </div>
+        <div className="lg:col-span-1">
+          <div className="sticky top-6">
+            <ExpenseForm
+              transactionType="both"
+              onExpenseAdded={() => {
+                console.log('✅ Transaction added, refreshing data...');
+                fetchDashboardData();
+              }}
+            />
+          </div>
         </div>
       </div>
 

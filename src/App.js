@@ -1,12 +1,21 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ClientProvider } from './contexts/ClientContext';
+import { PaymentProvider } from './contexts/PaymentContext';
 import Login from './components/auth/Login';
 import Dashboard from './components/dashboard/Dashboard';
 import Layout from './components/layout/Layout';
 import LoadingSpinner from './components/common/LoadingSpinner';
+
+// React Router v7 Future Flags for compatibility
+const routerOpts = {
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+  },
+};
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -32,7 +41,7 @@ const PublicRoute = ({ children }) => {
 
 function AppContent() {
   return (
-    <Router>
+    <Router future={routerOpts.future}>
       <div className="App">
         <Toaster
           position="top-right"
@@ -94,7 +103,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ClientProvider>
+        <PaymentProvider>
+          <AppContent />
+        </PaymentProvider>
+      </ClientProvider>
     </AuthProvider>
   );
 }

@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  ShoppingCart, 
-  DollarSign, 
+import {
+  Users,
+  ShoppingCart,
+  DollarSign,
   TrendingUp,
   Activity,
   AlertCircle,
   CheckCircle,
   Clock
 } from 'lucide-react';
-import axios from 'axios';
+import { PieChart, Pie, LineChart, Line, ResponsiveContainer, Tooltip, Cell, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { startOfMonth, format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+import { authOps, clientOps, paymentOps, orderOps } from '../../services/jsonbin-new';
 import StatsCard from '../common/StatsCard';
 import RecentActivity from '../common/RecentActivity';
 import LoadingSpinner from '../common/LoadingSpinner';
@@ -21,15 +23,78 @@ const SuperAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardStats();
+    loadDashboardData();
   }, []);
 
-  const fetchDashboardStats = async () => {
+  const loadDashboardData = async () => {
     try {
-      const response = await axios.get('/dashboard/stats');
-      setStats(response.data);
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      setLoading(true);
+
+      // Load all data from JSONBin
+      const [users, clients, payments, orders] = await Promise.all([
+        authOps.getUsers().catch(() => []),
+        clientOps.getClients().catch(() => []),
+        paymentOps.getPayments().catch(() => []),
+        orderOps.getOrders().catch(() => [])
+      ]);
+
+      console.log('✅ Loaded dashboard data:', {
+        users: users.length,
+        clients: clients.length,
+        payments: payments.length,
+        orders: orders.length
+      });
+
+      // Calculate stats
+      const userStats = {};
+      users.forEach(u => {
+        if (!userStats[u.role]) userStats[u.role] = { count: 0, active: 0 };
+        userStats[u.role].count++;
+        if (u.status === 'active') userStats[u.role].active++;
+      });
+
+      const orderStats = {};
+      orders.forEach(o => {
+        if (!orderStats[o.status]) orderStats[o.status] = { count: 0 };
+        orderStats[o.status].count++;
+      });
+
+      const revenue = {
+        totalRevenue: payments.reduce((sum, p) => sum + (p.type === 'income' ? p.amount : 0), 0),
+        totalProfit: payments.reduce((sum, p) => {
+          if (p.type === 'income') return sum + p.amount;
+          if (p.type === 'expense') return sum - p.amount;
+          return sum;
+        }, 0)
+      };
+
+      // Process monthly revenue for chart
+      const monthlyRevenue = {};
+      payments.forEach(payment => {
+        if (payment.type === 'income') {
+          const month = format(startOfMonth(new Date(payment.createdAt || Date.now())), 'yyyy-MM');
+          monthlyRevenue[month] = (monthlyRevenue[month] || 0) + payment.amount;
+        }
+      });
+
+      const monthlyRevenueData = Object.entries(monthlyRevenue)
+        .map(([month, amount]) => ({ month, revenue: amount }))
+        .sort((a, b) => a.month.localeCompare(b.month));
+
+      setStats({
+        users: Object.entries(userStats).map(([role, data]) => ({ _id: role, ...data })),
+        totalClients: clients.length,
+        revenue,
+        orderStatusBreakdown: Object.entries(orderStats).map(([status, data]) => ({ _id: status, count: data.count })),
+        monthlyRevenueData,
+        recentActivity: [
+          ...payments.slice(-3).map(p => ({ type: 'payment', description: `${p.type}: ${p.amount} TND`, createdAt: p.createdAt })),
+          ...orders.slice(-2).map(o => ({ type: 'order', description: `New order for ${o.clientName}`, createdAt: o.createdAt }))
+        ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
+      });
+
+    } catch (err) {
+      console.error('❌ Failed to load dashboard data:', err);
     } finally {
       setLoading(false);
     }
@@ -47,6 +112,19 @@ const SuperAdminDashboard = () => {
   const activeUsers = stats?.users?.reduce((sum, user) => sum + user.active, 0) || 0;
   const totalRevenue = stats?.revenue?.totalRevenue || 0;
   const totalProfit = stats?.revenue?.totalProfit || 0;
+
+  // Prepare chart data
+  const userRoleData = stats?.users?.map(user => ({
+    name: user._id.replace('_', ' '),
+    value: user.count
+  })) || [];
+
+  const orderStatusData = stats?.orderStatusBreakdown?.map(status => ({
+    name: status._id.replace('_', ' '),
+    value: status.count
+  })) || [];
+
+  const ORDER_STATUS_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
 
   return (
     <div className="space-y-6">
@@ -106,6 +184,67 @@ const SuperAdminDashboard = () => {
           color="purple"
           trend={{ value: 23, isPositive: true }}
         />
+      </div>
+
+      {/* Analytics Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* User Role Distribution Pie Chart */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">User Role Distribution</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={userRoleData}
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                dataKey="value"
+                label={({ name, value }) => `${name}: ${value}`}
+              >
+                {userRoleData.map((entry, index) => (
+                  <Cell key={`user-cell-${index}`} fill={ORDER_STATUS_COLORS[index % ORDER_STATUS_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Order Status Breakdown Pie Chart */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status Breakdown</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={orderStatusData}
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                dataKey="value"
+                label={({ name, value }) => `${name}: ${value}`}
+              >
+                {orderStatusData.map((entry, index) => (
+                  <Cell key={`order-cell-${index}`} fill={ORDER_STATUS_COLORS[index % ORDER_STATUS_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Monthly Revenue Trend Line Chart */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Revenue Trend</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={stats?.monthlyRevenueData || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey="revenue" stroke="#8884d8" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Status Overview */}
