@@ -26,7 +26,7 @@ const OrderManagement = () => {
       setLoading(true);
       setError('');
       // Fetch clients and treat them as orders
-      const clients = clientOps.getClients();
+      const clients = await clientOps.getClients();
 
       // Filter by status if needed
       let filteredClients = clients;

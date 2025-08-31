@@ -101,10 +101,7 @@ const Sidebar = ({ isOpen, onClose, user }) => {
               </div>
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  Welcome back,
-                </p>
-                <p className="text-sm text-gray-600 truncate">
-                  {user?.fullName}
+                  Welcome back, {user?.fullName} 😊
                 </p>
               </div>
             </div>
@@ -186,7 +183,7 @@ const Sidebar = ({ isOpen, onClose, user }) => {
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-900">
-                  {user?.fullName}
+                  Welcome back, {user?.fullName} 😊
                 </p>
                 <p className="text-xs text-gray-600 capitalize">
                   {user?.role?.replace('_', ' ')}

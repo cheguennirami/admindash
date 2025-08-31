@@ -52,7 +52,12 @@ const Dashboard = () => {
       {['super_admin', 'logistics'].includes(user?.role) && (
         <Route path="orders/*" element={<OrderManagement />} />
       )}
-      
+
+      {/* Logistics Dashboard - Logistics, Super Admin */}
+      {['super_admin', 'logistics'].includes(user?.role) && (
+        <Route path="logistics/*" element={<LogisticsDashboard />} />
+      )}
+
       {/* Payment Management - Treasurer, Super Admin */}
       {['super_admin', 'treasurer'].includes(user?.role) && (
         <Route path="payments/*" element={<PaymentManagement />} />
