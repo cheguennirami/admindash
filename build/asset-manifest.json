@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/static/css/main.4e1f0c44.css",
+    "main.js": "/static/js/main.c05c121a.js",
+    "static/media/shein-logo.png": "/static/media/shein-logo.4166e46bc5312384a790.png",
+    "index.html": "/index.html",
+    "main.4e1f0c44.css.map": "/static/css/main.4e1f0c44.css.map",
+    "main.c05c121a.js.map": "/static/js/main.c05c121a.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.4e1f0c44.css",
+    "static/js/main.c05c121a.js"
+  ]
+}
