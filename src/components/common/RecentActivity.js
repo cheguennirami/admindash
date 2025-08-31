@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { ShoppingCart, User, CheckCircle, Clock } from 'lucide-react';
+import { ShoppingCart, CheckCircle, Clock } from 'lucide-react';
 
 const RecentActivity = ({ activities = [] }) => {
   const getActivityIcon = (activity) => {

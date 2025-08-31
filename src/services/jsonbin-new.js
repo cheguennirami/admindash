@@ -92,7 +92,7 @@ const jsonbinAPI = {
     return enqueueRequest(async () => {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const requestTimeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
         const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
           method: 'GET',
@@ -103,7 +103,7 @@ const jsonbinAPI = {
           signal: controller.signal
         });
 
-        clearTimeout(timeoutId);
+        clearTimeout(requestTimeoutId);
         if (response.ok) {
           return await response.json();
         } else {
@@ -146,7 +146,7 @@ const jsonbinAPI = {
     return enqueueRequest(async () => {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const putTimeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
         const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
           method: 'PUT',
@@ -158,6 +158,8 @@ const jsonbinAPI = {
           body: JSON.stringify(data),
           signal: controller.signal
         });
+
+        clearTimeout(putTimeoutId);
 
         if (response.ok) {
           return true;

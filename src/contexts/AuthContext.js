@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      const token = localStorage.getItem('token');
+      const savedToken = localStorage.getItem('token');
       const savedUser = localStorage.getItem('user');
 
       if (savedUser) {

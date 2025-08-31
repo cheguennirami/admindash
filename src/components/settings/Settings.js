@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
-import { authOps } from '../../services/jsonbin-new'; // Import JSONBin auth operations
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 

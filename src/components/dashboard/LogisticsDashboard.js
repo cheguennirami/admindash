@@ -9,7 +9,6 @@ import {
   Send,
   Eye,
   RefreshCw,
-  DollarSign,
   CreditCard
 } from 'lucide-react';
 import { orderOps, providerPaymentOps } from '../../services/jsonbin-new';

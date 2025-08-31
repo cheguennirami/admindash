@@ -18,7 +18,7 @@ const StatsCard = ({
     teal: 'bg-teal-500 text-teal-600 bg-teal-50'
   };
 
-  const [bgColor, textColor, lightBg] = (colorClasses[color] || colorClasses.blue).split(' ');
+  const [/* bgColor */, textColor, lightBg] = (colorClasses[color] || colorClasses.blue).split(' ');
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
