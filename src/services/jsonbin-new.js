@@ -6,6 +6,16 @@ const STORAGE_KEY = 'shein_dashboard_data';
 // Use guaranteed configuration
 const { apiKey: JSONBIN_API_KEY, binId: JSONBIN_BIN_ID, baseUrl: JSONBIN_BASE_URL } = getFinalConfig();
 
+// Debug configuration in production
+if (typeof window !== 'undefined' && !JSONBIN_API_KEY) {
+  console.warn('⚠️ Production Debug: JSONBin API key not found, using fallback config');
+  console.log('🔧 Available env vars (production):', Object.keys(process.env || {}).filter(key => key.includes('JSONBIN')));
+}
+if (typeof window !== 'undefined') {
+  console.log(`🔗 JSONBin Config: URL=${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID || '[missing]'}`);
+  console.log(`🔑 Using Fallback: ${!process.env.REACT_APP_JSONBIN_API_KEY}`);
+}
+
 const getEmptyData = () => ({
   users: [],
   clients: [],
