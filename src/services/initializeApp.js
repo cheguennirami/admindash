@@ -1,4 +1,4 @@
-import { initializeAppData } from './jsonbin-simple';
+import { initializeAppData } from './jsonbin-new';
 import toast from 'react-hot-toast';
 
 // This function initializes the app by connecting to JSONBin

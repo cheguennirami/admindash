@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { initializeAppData } from '../../services/jsonbin-simple';
+import { initializeAppData } from '../../services/jsonbin-new';
 
 const JsonbinStatus = () => {
   const [status, setStatus] = useState('checking');

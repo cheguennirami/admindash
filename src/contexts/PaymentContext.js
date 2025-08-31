@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { paymentOps, initializeAppData } from '../services/jsonbin-simple';
+import { paymentOps, initializeAppData } from '../services/jsonbin-new';
 
 const PaymentContext = createContext();
 

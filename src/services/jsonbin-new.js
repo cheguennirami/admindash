@@ -18,53 +18,181 @@ const getEmptyData = () => ({
   }
 });
 
-// 🌐 JSONBin API Operations
+// 🌐 JSONBin API Operations with Request Throttling
+let pendingRequests = 0;
+const maxConcurrentRequests = 3;
+const requestQueue = [];
+
+async function processQueue() {
+  if (pendingRequests >= maxConcurrentRequests || requestQueue.length === 0) {
+    return;
+  }
+
+  const { operation, resolve, reject } = requestQueue.shift();
+  pendingRequests++;
+
+  try {
+    const result = await operation();
+    resolve(result);
+  } catch (error) {
+    reject(error);
+  } finally {
+    pendingRequests--;
+    // Process next request in queue
+    setTimeout(processQueue, 100);
+  }
+}
+
+function enqueueRequest(operation, retries = 3) {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ operation: () => executeWithRetry(operation, retries), resolve, reject });
+    processQueue();
+  });
+}
+
+async function executeWithRetry(operation, retries = 3) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (i === retries) {
+        throw error;
+      }
+
+      // Only retry on transient network errors
+      if (!isRetryableError(error)) {
+        throw error;
+      }
+
+      console.log(`⚠️ JSONBin API request failed (attempt ${i + 1}/${retries + 1}), retrying...`);
+
+      // Exponential backoff
+      const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+function isRetryableError(error) {
+  // Retry on network errors, timeouts, and certain HTTP 5xx errors
+  if (error.name === 'AbortError') return true;
+  if (error.message.includes('NetworkError') || error.message.includes('CORS')) return true;
+  if (error.message.includes('fetch') && error.message.includes('failed')) return true;
+  return false;
+}
+
 const jsonbinAPI = {
   async get() {
-    // Skip all JSONBin operations in development (CORS issues)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('🔄 Skipping JSONBin GET (Development mode)');
+    // Check if JSONBin is available
+    if (!JSONBIN_API_KEY || !JSONBIN_BIN_ID) {
+      console.log('⚠️ JSONBin credentials not available');
       return null;
     }
 
-    try {
-      const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
-        mode: 'cors',
-        headers: {
-          'X-Master-Key': JSONBIN_API_KEY,
-          'Content-Type': 'application/json'
+    return enqueueRequest(async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
+          method: 'GET',
+          headers: {
+            'X-Master-Key': JSONBIN_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        if (response.ok) {
+          return await response.json();
+        } else {
+          // Handle specific HTTP error codes
+          if (response.status === 401) {
+            throw new Error('Unauthorized: Invalid API credentials');
+          } else if (response.status === 404) {
+            throw new Error('Not Found: JSONBin resource not found or credentials invalid');
+          } else if (response.status === 429) {
+            throw new Error('Too Many Requests: Rate limit exceeded');
+          } else if (response.status >= 500) {
+            throw new Error(`Server Error: ${response.status} - JSONBin server error`);
+          } else {
+            throw new Error(`HTTP Error: ${response.status} - ${response.statusText}`);
+          }
         }
-      });
-      return response.ok ? await response.json() : null;
-    } catch (error) {
-      console.warn('⚠️ JSONBin Error:', error);
-      return null;
-    }
+      } catch (error) {
+        console.warn('⚠️ JSONBin GET Error:', error.message);
+
+        if (error.name === 'AbortError') {
+          console.warn('🕒 JSONBin request timed out (10s)');
+        } else if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
+          console.warn('🚫 CORS or Network error - unable to access JSONBin');
+        } else if (error.message.includes('fetch')) {
+          console.warn('🚫 Network connectivity issue - check internet connection');
+        }
+
+        throw error; // Let retry logic handle this
+      }
+    });
   },
 
   async put(data) {
-    // Skip all JSONBin operations in development (CORS issues)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('🔄 Skipping JSONBin PUT (Development mode)');
+    // Check if JSONBin is available
+    if (!JSONBIN_API_KEY || !JSONBIN_BIN_ID) {
+      console.log('⚠️ JSONBin credentials not available');
       return false;
     }
 
-    try {
-      const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
-        mode: 'cors',
-        method: 'PUT',
-        headers: {
-          'X-Master-Key': JSONBIN_API_KEY,
-          'Content-Type': 'application/json',
-          'X-Bin-Versioning': 'false'
-        },
-        body: JSON.stringify(data)
-      });
-      return response.ok;
-    } catch (error) {
-      console.warn('⚠️ JSONBin Error:', error);
-      return false;
-    }
+    return enqueueRequest(async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
+          method: 'PUT',
+          headers: {
+            'X-Master-Key': JSONBIN_API_KEY,
+            'Content-Type': 'application/json',
+            'X-Bin-Versioning': 'false'
+          },
+          body: JSON.stringify(data),
+          signal: controller.signal
+        });
+
+        if (response.ok) {
+          return true;
+        } else {
+          // Handle specific HTTP error codes for PUT operations
+          if (response.status === 401) {
+            throw new Error('Unauthorized: Invalid or missing JSONBin API credentials');
+          } else if (response.status === 403) {
+            throw new Error('Forbidden: API credentials do not have write permissions');
+          } else if (response.status === 404) {
+            throw new Error('Not Found: JSONBin bin not found');
+          } else if (response.status === 429) {
+            throw new Error('Too Many Requests: Rate limit exceeded, please wait');
+          } else if (response.status === 413) {
+            throw new Error('Request Entity Too Large: Data payload exceeds JSONBin limits');
+          } else if (response.status >= 500) {
+            throw new Error(`Server Error: ${response.status} - JSONBin server unavailable`);
+          } else {
+            throw new Error(`HTTP Error: ${response.status} - ${response.statusText}`);
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ JSONBin PUT Error:', error.message);
+
+        if (error.name === 'AbortError') {
+          console.warn('🕒 JSONBin request timed out (10s)');
+        } else if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
+          console.warn('🚫 CORS or Network error - unable to access JSONBin');
+        } else if (error.message.includes('fetch')) {
+          console.warn('🚫 Network connectivity issue during save operation');
+        }
+
+        throw error; // Let retry logic handle this
+      }
+    });
   }
 };
 
@@ -94,31 +222,42 @@ export const dataManager = {
   async loadData() {
     console.log('📥 Loading application data...');
 
-    // Skip JSONBin in development to avoid CORS issues
-    if (process.env.NODE_ENV === 'production' && JSONBIN_API_KEY && JSONBIN_BIN_ID) {
+    // Try to load from JSONBin first (if credentials available)
+    if (JSONBIN_API_KEY && JSONBIN_BIN_ID) {
+      console.log('🌐 Attempting to load from JSONBin...');
       const remoteData = await jsonbinAPI.get();
       if (remoteData?.record) {
         console.log('✅ Data loaded from JSONBin');
+        // Sync remote data to local storage
         localStorageOps.set(remoteData.record);
         return remoteData.record;
+      } else {
+        console.log('⚠️ Could not load from JSONBin, trying localStorage...');
       }
     }
 
-    console.log('📋 Using localStorage data (Development mode)');
-    return localStorageOps.get();
+    // Fallback to localStorage
+    console.log('📋 Loading from localStorage');
+    const localData = localStorageOps.get();
+    return localData;
   },
 
   async saveData(data) {
+    // Always save to localStorage first
     localStorageOps.set(data);
+    console.log('💾 Data saved to localStorage');
 
-    // Only save to JSONBin in production to avoid CORS issues
-    if (process.env.NODE_ENV === 'production' && JSONBIN_API_KEY && JSONBIN_BIN_ID) {
+    // Try to sync to JSONBin (if credentials available)
+    if (JSONBIN_API_KEY && JSONBIN_BIN_ID) {
+      console.log('☁️ Syncing to JSONBin...');
       const success = await jsonbinAPI.put(data);
       if (success) {
-        console.log('✅ Data synced to JSONBin');
+        console.log('✅ Data successfully synced to JSONBin');
       } else {
-        console.warn('⚠️ JSONBin sync failed, data saved locally only');
+        console.warn('⚠️ JSONBin sync failed, but data is safe locally');
       }
+    } else {
+      console.log('ℹ️ JSONBin credentials not available, data stored locally only');
     }
 
     return data;
@@ -670,3 +809,45 @@ export const providerPaymentOps = {
 
 // ⚙️ Utility function to get all data
 export const getAppData = () => dataManager.loadData();
+
+// 🔄 Compatibility exports for jsonbin-simple.js consolidation
+
+// Export initializeAppData as alias for dataManager.loadData
+export const initializeAppData = () => dataManager.loadData();
+
+// Add compatibility aliases for existing methods
+authOps.getUser = async (userId) => {
+  const data = await dataManager.loadData();
+  const user = data.users?.find(u => u._id === userId);
+  if (!user) throw new Error('User not found');
+  return user;
+};
+
+authOps.getAllUsers = async () => {
+  const data = await dataManager.loadData();
+  return data.users || [];
+};
+
+authOps.changePassword = async (userId, currentPassword, newPassword) => {
+  await authOps.updateUserPassword(userId, newPassword);
+  return true;
+};
+
+paymentOps.addPayment = async (paymentData) => {
+  return await paymentOps.createPayment(paymentData);
+};
+
+paymentOps.getClientPayments = async (clientId) => {
+  return await paymentOps.getPaymentsByClient(clientId);
+};
+
+clientOps.addClient = async (clientData) => {
+  return await clientOps.createClient(clientData);
+};
+
+clientOps.getClient = async (clientId) => {
+  const clients = await clientOps.getClients();
+  const client = clients.find(c => c._id === clientId);
+  if (!client) throw new Error('Client not found');
+  return client;
+};

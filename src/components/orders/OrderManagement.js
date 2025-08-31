@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { clientOps } from '../../services/jsonbin'; // Import local services
+import { clientOps } from '../../services/jsonbin-new'; // Import local services
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
