@@ -79,26 +79,6 @@ const PaymentsList = () => {
   // Get unique categories for filter dropdown
   const categories = [...new Set(payments.map(p => p.category).filter(Boolean))];
 
-  const collectUsers = async () => {
-    try {
-      const { authOps } = await import('../../services/jsonbin-new');
-      const users = await authOps.getUsers();
-      return users.filter(user => user.isActive);
-    } catch {
-      return [];
-    }
-  };
-
-  const collectClients = async () => {
-    try {
-      const { clientOps } = await import('../../services/jsonbin-new');
-      const clients = await clientOps.getClients();
-      return clients;
-    } catch {
-      return [];
-    }
-  };
-
   const handleEdit = async (payment) => {
     setEditingPayment({ ...payment });
     setShowEditModal(true);
