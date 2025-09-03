@@ -6,7 +6,8 @@ import {
   Users,
   Plus,
   Eye,
-  BarChart3
+  BarChart3,
+  X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +21,8 @@ const MarketingDashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentClients, setRecentClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showStatistics, setShowStatistics] = useState(false);
+  const [detailedStats, setDetailedStats] = useState({});
 
   useEffect(() => {
     fetchDashboardData();
@@ -45,7 +48,7 @@ const MarketingDashboard = () => {
         .reduce((sum, p) => sum + (p.amount || 0), 0);
       const confirmedOrders = clients.filter(c => c.confirmation === 'confirmed').length;
 
-      setStats({
+      const statsData = {
         totalClients,
         totalOrders: confirmedOrders,
         revenue: {
@@ -60,6 +63,32 @@ const MarketingDashboard = () => {
           { _id: 'delivered_to_client', count: clients.filter(c => c.status === 'delivered_to_client').length }
         ].filter(status => status.count > 0),
         monthlyRevenue: [] // Can be enhanced later for real monthly data
+      };
+
+      setStats(statsData);
+
+      // Calculate detailed statistics
+      const averageOrderValue = totalClients > 0 ?
+        clients.filter(c => c.sellingPrice).reduce((sum, c) => sum + (c.sellingPrice || 0), 0) / clients.filter(c => c.sellingPrice).length : 0;
+
+      const paymentStatusStats = {
+        fullyPaid: clients.filter(c => c.advancePaid && c.remainingPaid).length,
+        partiallyPaid: clients.filter(c => (c.advancePaid || c.remainingPaid)).length,
+        unpaid: clients.filter(c => !c.advancePaid && !c.remainingPaid).length,
+        advanceOnly: clients.filter(c => c.advancePaid && !c.remainingPaid).length,
+        remainingOnly: clients.filter(c => !c.advancePaid && c.remainingPaid).length
+      };
+
+      setDetailedStats({
+        averageOrderValue,
+        conversionRate: totalClients > 0 ? (confirmedOrders / totalClients * 100).toFixed(1) : 0,
+        priceRangeBreakdown: {
+          low: clients.filter(c => (c.sellingPrice || 0) < 100).length,
+          medium: clients.filter(c => (c.sellingPrice || 0) >= 100 && (c.sellingPrice || 0) < 500).length,
+          high: clients.filter(c => (c.sellingPrice || 0) >= 500).length
+        },
+        paymentStatusStats,
+        monthlyStats: [] // Can be enhanced with real date-based data
       });
 
       // Set recent clients (most recent 5)
@@ -82,6 +111,7 @@ const MarketingDashboard = () => {
         monthlyRevenue: []
       });
       setRecentClients([]);
+      setDetailedStats({});
     } finally {
       setLoading(false);
     }
@@ -215,6 +245,9 @@ const MarketingDashboard = () => {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{client.fullName}</p>
                   <p className="text-xs text-gray-500">Order: {client.orderId}</p>
+                  <p className="text-xs text-purple-600 truncate max-w-xs" title={client.cart || 'No cart info'}>
+                    Cart: {client.cart || 'N/A'}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-gray-900">{client.sellingPrice} TND</p>
@@ -281,7 +314,10 @@ const MarketingDashboard = () => {
               </div>
             </Link>
             
-            <button className="flex items-center w-full p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group">
+            <button
+              onClick={() => setShowStatistics(true)}
+              className="flex items-center w-full p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+            >
               <div className="h-10 w-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
                 <BarChart3 className="h-5 w-5 text-white" />
               </div>
@@ -308,6 +344,97 @@ const MarketingDashboard = () => {
           ))}
         </div>
       </div>
+
+      {/* Statistics Modal */}
+      {showStatistics && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Detailed Statistics</h2>
+                <button
+                  onClick={() => setShowStatistics(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-6 w-6 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Average Order Value</h3>
+                  <p className="text-3xl font-bold text-purple-600">
+                    {detailedStats?.averageOrderValue?.toFixed(2)} TND
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Conversion Rate</h3>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {detailedStats?.conversionRate}%
+                  </p>
+                  <p className="text-sm text-gray-600">Confirmed vs Total Orders</p>
+                </div>
+
+                <div className="bg-gradient-to-r from-green-50 to-teal-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Fully Paid Orders</h3>
+                  <p className="text-3xl font-bold text-green-600">
+                    {detailedStats?.paymentStatusStats?.fullyPaid || 0}
+                  </p>
+                  <p className="text-sm text-gray-600">Advance + Remaining</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Price Range Breakdown</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">{"Low (< 100 TND)"}</span>
+                      <span className="font-semibold">{detailedStats?.priceRangeBreakdown?.low || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Medium (100-500 TND)</span>
+                      <span className="font-semibold">{detailedStats?.priceRangeBreakdown?.medium || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">{"High (>= 500 TND)"}</span>
+                      <span className="font-semibold">{detailedStats?.priceRangeBreakdown?.high || 0}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Status Breakdown</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Fully Paid</span>
+                      <span className="font-semibold text-green-600">{detailedStats?.paymentStatusStats?.fullyPaid || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Partial Payment</span>
+                      <span className="font-semibold text-yellow-600">{detailedStats?.paymentStatusStats?.partiallyPaid || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Unpaid</span>
+                      <span className="font-semibold text-red-600">{detailedStats?.paymentStatusStats?.unpaid || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 flex justify-end">
+                <button
+                  onClick={() => setShowStatistics(false)}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

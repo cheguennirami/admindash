@@ -221,6 +221,9 @@ const ClientList = () => {
                       Prices
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cart
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Advance (30%)
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -257,6 +260,11 @@ const ClientList = () => {
                           <div>Buy: {client.buyingPrice} TND</div>
                           <div className="font-medium">Sell: {client.sellingPrice} TND</div>
                           <div className="text-xs text-green-600">Profit: {(client.sellingPrice - client.buyingPrice).toFixed(2)} TND</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div className="truncate max-w-xs" title={client.cart || 'No cart information'}>
+                          {client.cart || 'N/A'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

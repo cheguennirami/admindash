@@ -38,12 +38,6 @@ const SuperAdminDashboard = () => {
         orderOps.getOrders().catch(() => [])
       ]);
 
-      console.log('✅ Loaded dashboard data:', {
-        users: users.length,
-        clients: clients.length,
-        payments: payments.length,
-        orders: orders.length
-      });
 
       // Calculate stats
       const userStats = {};
@@ -88,13 +82,13 @@ const SuperAdminDashboard = () => {
         orderStatusBreakdown: Object.entries(orderStats).map(([status, data]) => ({ _id: status, count: data.count })),
         monthlyRevenueData,
         recentActivity: [
-          ...payments.slice(-3).map(p => ({ type: 'payment', description: `${p.type}: ${p.amount} TND`, createdAt: p.createdAt })),
+          ...clients.slice(-2).map(c => ({ type: 'client', description: `New client created`, createdAt: c.createdAt, fullName: c.fullName, createdBy: c.createdBy })),
+          ...payments.slice(-2).map(p => ({ type: 'payment', description: `${p.type}: ${p.amount} TND`, createdAt: p.createdAt })),
           ...orders.slice(-2).map(o => ({ type: 'order', description: `New order for ${o.clientName}`, createdAt: o.createdAt }))
         ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
       });
 
     } catch (err) {
-      console.error('❌ Failed to load dashboard data:', err);
     } finally {
       setLoading(false);
     }

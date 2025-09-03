@@ -1,20 +1,8 @@
 import { getFinalConfig } from '../config/jsonbin';
 
-// 🎯 Complete JSONBin Service - Final Version
 const STORAGE_KEY = 'shein_dashboard_data';
 
-// Use guaranteed configuration
 const { apiKey: JSONBIN_API_KEY, binId: JSONBIN_BIN_ID, baseUrl: JSONBIN_BASE_URL } = getFinalConfig();
-
-// Debug configuration in production
-if (typeof window !== 'undefined' && !JSONBIN_API_KEY) {
-  console.warn('⚠️ Production Debug: JSONBin API key not found, using fallback config');
-  console.log('🔧 Available env vars (production):', Object.keys(process.env || {}).filter(key => key.includes('JSONBIN')));
-}
-if (typeof window !== 'undefined') {
-  console.log(`🔗 JSONBin Config: URL=${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID || '[missing]'}`);
-  console.log(`🔑 Using Fallback: ${!process.env.REACT_APP_JSONBIN_API_KEY}`);
-}
 
 const getEmptyData = () => ({
   users: [],
@@ -28,7 +16,6 @@ const getEmptyData = () => ({
   }
 });
 
-// 🌐 JSONBin API Operations with Request Throttling
 let pendingRequests = 0;
 const maxConcurrentRequests = 3;
 const requestQueue = [];
@@ -48,7 +35,6 @@ async function processQueue() {
     reject(error);
   } finally {
     pendingRequests--;
-    // Process next request in queue
     setTimeout(processQueue, 100);
   }
 }
@@ -69,14 +55,10 @@ async function executeWithRetry(operation, retries = 3) {
         throw error;
       }
 
-      // Only retry on transient network errors
       if (!isRetryableError(error)) {
         throw error;
       }
 
-      console.log(`⚠️ JSONBin API request failed (attempt ${i + 1}/${retries + 1}), retrying...`);
-
-      // Exponential backoff
       const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
       await new Promise(resolve => setTimeout(resolve, delay));
     }
@@ -84,7 +66,6 @@ async function executeWithRetry(operation, retries = 3) {
 }
 
 function isRetryableError(error) {
-  // Retry on network errors, timeouts, and certain HTTP 5xx errors
   if (error.name === 'AbortError') return true;
   if (error.message.includes('NetworkError') || error.message.includes('CORS')) return true;
   if (error.message.includes('fetch') && error.message.includes('failed')) return true;
@@ -93,16 +74,14 @@ function isRetryableError(error) {
 
 const jsonbinAPI = {
   async get() {
-    // Check if JSONBin is available
     if (!JSONBIN_API_KEY || !JSONBIN_BIN_ID) {
-      console.log('⚠️ JSONBin credentials not available');
       return null;
     }
 
     return enqueueRequest(async () => {
       try {
         const controller = new AbortController();
-        const requestTimeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const requestTimeoutId = setTimeout(() => controller.abort(), 10000);
 
         const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
           method: 'GET',
@@ -117,7 +96,6 @@ const jsonbinAPI = {
         if (response.ok) {
           return await response.json();
         } else {
-          // Handle specific HTTP error codes
           if (response.status === 401) {
             throw new Error('Unauthorized: Invalid API credentials');
           } else if (response.status === 404) {
@@ -131,32 +109,23 @@ const jsonbinAPI = {
           }
         }
       } catch (error) {
-        console.warn('⚠️ JSONBin GET Error:', error.message);
-
         if (error.name === 'AbortError') {
-          console.warn('🕒 JSONBin request timed out (10s)');
-        } else if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
-          console.warn('🚫 CORS or Network error - unable to access JSONBin');
-        } else if (error.message.includes('fetch')) {
-          console.warn('🚫 Network connectivity issue - check internet connection');
+          throw new Error('Request timed out');
         }
-
-        throw error; // Let retry logic handle this
+        throw error;
       }
     });
   },
 
   async put(data) {
-    // Check if JSONBin is available
     if (!JSONBIN_API_KEY || !JSONBIN_BIN_ID) {
-      console.log('⚠️ JSONBin credentials not available');
       return false;
     }
 
     return enqueueRequest(async () => {
       try {
         const controller = new AbortController();
-        const putTimeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const putTimeoutId = setTimeout(() => controller.abort(), 10000);
 
         const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
           method: 'PUT',
@@ -174,7 +143,6 @@ const jsonbinAPI = {
         if (response.ok) {
           return true;
         } else {
-          // Handle specific HTTP error codes for PUT operations
           if (response.status === 401) {
             throw new Error('Unauthorized: Invalid or missing JSONBin API credentials');
           } else if (response.status === 403) {
@@ -192,23 +160,15 @@ const jsonbinAPI = {
           }
         }
       } catch (error) {
-        console.warn('⚠️ JSONBin PUT Error:', error.message);
-
         if (error.name === 'AbortError') {
-          console.warn('🕒 JSONBin request timed out (10s)');
-        } else if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
-          console.warn('🚫 CORS or Network error - unable to access JSONBin');
-        } else if (error.message.includes('fetch')) {
-          console.warn('🚫 Network connectivity issue during save operation');
+          throw new Error('Request timed out');
         }
-
-        throw error; // Let retry logic handle this
+        throw error;
       }
     });
   }
 };
 
-// 🏠 Local Storage Operations
 const localStorageOps = {
   get() {
     try {
@@ -229,54 +189,31 @@ const localStorageOps = {
   }
 };
 
-// 🎯 Main Data Manager
 export const dataManager = {
   async loadData() {
-    console.log('📥 Loading application data...');
-
-    // Try to load from JSONBin first (if credentials available)
     if (JSONBIN_API_KEY && JSONBIN_BIN_ID) {
-      console.log('🌐 Attempting to load from JSONBin...');
       const remoteData = await jsonbinAPI.get();
       if (remoteData?.record) {
-        console.log('✅ Data loaded from JSONBin');
-        // Sync remote data to local storage
         localStorageOps.set(remoteData.record);
         return remoteData.record;
-      } else {
-        console.log('⚠️ Could not load from JSONBin, trying localStorage...');
       }
     }
 
-    // Fallback to localStorage
-    console.log('📋 Loading from localStorage');
     const localData = localStorageOps.get();
     return localData;
   },
 
   async saveData(data) {
-    // Always save to localStorage first
     localStorageOps.set(data);
-    console.log('💾 Data saved to localStorage');
 
-    // Try to sync to JSONBin (if credentials available)
     if (JSONBIN_API_KEY && JSONBIN_BIN_ID) {
-      console.log('☁️ Syncing to JSONBin...');
-      const success = await jsonbinAPI.put(data);
-      if (success) {
-        console.log('✅ Data successfully synced to JSONBin');
-      } else {
-        console.warn('⚠️ JSONBin sync failed, but data is safe locally');
-      }
-    } else {
-      console.log('ℹ️ JSONBin credentials not available, data stored locally only');
+      await jsonbinAPI.put(data);
     }
 
     return data;
   }
 };
 
-// 👥 Authentication Operations
 export const authOps = {
   async login(email, password) {
     const data = await dataManager.loadData();
@@ -371,7 +308,6 @@ export const authOps = {
   }
 };
 
-// 👥 Client Operations
 export const clientOps = {
   async getClients() {
     const data = await dataManager.loadData();
@@ -423,7 +359,6 @@ export const clientOps = {
   }
 };
 
-// 💰 Payment Operations with Auto-Income
 export const paymentOps = {
   async getPayments() {
     const data = await dataManager.loadData();
@@ -441,19 +376,16 @@ export const paymentOps = {
 
     data.payments = [...(data.payments || []), newPayment];
 
-    // Auto-update client payment status if client ID is provided
     if (paymentData.clientId && paymentData.type === 'advance') {
       const clientToUpdate = data.clients?.find(c => c._id === paymentData.clientId);
       if (clientToUpdate) {
         if (paymentData.amount >= clientToUpdate.advanceAmount) {
           clientToUpdate.advancePaid = true;
-          console.log('✅ Auto-updated client advance payment status');
         }
       }
     }
 
     await dataManager.saveData(data);
-    console.log('✅ Payment added to JSONBin:', newPayment._id);
 
     return newPayment;
   },
@@ -461,6 +393,25 @@ export const paymentOps = {
   async getPaymentsByClient(clientId) {
     const payments = await this.getPayments();
     return payments.filter(p => p.clientId === clientId);
+  },
+
+  async updatePayment(paymentId, updates) {
+    const data = await dataManager.loadData();
+    const paymentIndex = data.payments?.findIndex(p => p._id === paymentId);
+
+    if (paymentIndex === -1 || paymentIndex === undefined) {
+      throw new Error('Payment not found');
+    }
+
+    data.payments[paymentIndex] = {
+      ...data.payments[paymentIndex],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    await dataManager.saveData(data);
+
+    return data.payments[paymentIndex];
   },
 
   async deletePayment(paymentId) {
@@ -473,7 +424,6 @@ export const paymentOps = {
 
     data.payments.splice(paymentIndex, 1);
     await dataManager.saveData(data);
-    console.log('✅ Payment deleted from JSONBin:', paymentId);
 
     return true;
   },
@@ -490,7 +440,6 @@ export const paymentOps = {
 
     data.payments = [...(data.payments || []), newExpense];
     await dataManager.saveData(data);
-    console.log('✅ Expense added to JSONBin:', newExpense._id);
 
     return newExpense;
   },
@@ -535,12 +484,11 @@ export const paymentOps = {
       pendingPayments,
       totalPayments: payments.filter(p => p.type !== 'expense').length,
       totalExpensesCount: payments.filter(p => p.type === 'expense').length,
-      recentPayments: payments.slice(-5) // Last 5 transactions
+      recentPayments: payments.slice(-5)
     };
   }
 };
 
-// 📦 Order Operations for Logistics
 export const orderOps = {
   async getOrders() {
     const data = await dataManager.loadData();
@@ -561,7 +509,6 @@ export const orderOps = {
 
     data.orders = [...(data.orders || []), newOrder];
     await dataManager.saveData(data);
-    console.log('✅ Order created from France:', newOrder._id);
 
     return newOrder;
   },
@@ -574,7 +521,6 @@ export const orderOps = {
       throw new Error('Order not found');
     }
 
-    // Add tracking update if status changed
     if (updates.status && updates.status !== data.orders[orderIndex].status) {
       const trackingUpdate = {
         status: updates.status,
@@ -617,13 +563,11 @@ export const orderOps = {
       timestamp: new Date().toISOString()
     };
 
-    // Add to order communications
     if (!order.communications) {
       order.communications = [];
     }
     order.communications.push(newCommunication);
 
-    // Add tracking update
     const trackingUpdate = {
       status: order.status,
       timestamp: new Date().toISOString(),
@@ -640,7 +584,6 @@ export const orderOps = {
     order.updatedAt = new Date().toISOString();
     await dataManager.saveData(data);
 
-    console.log('✅ France communication added to order:', orderId);
     return newCommunication;
   },
 
@@ -651,7 +594,6 @@ export const orderOps = {
   },
 
   async updateOrderStatusFromFrance(orderId, newStatus, location, notes) {
-    // Also send communication
     await this.addCommunication(orderId, {
       message: `Order status updated: ${newStatus}`,
       location: location || 'France',
@@ -662,7 +604,6 @@ export const orderOps = {
   }
 };
 
-// 🏦 Provider Payment Operations
 export const providerPaymentOps = {
   async getProviderPayments() {
     const data = await dataManager.loadData();
@@ -692,7 +633,6 @@ export const providerPaymentOps = {
     }
     data.providerPayments = [...data.providerPayments, newPayment];
     await dataManager.saveData(data);
-    console.log('✅ Provider payment created:', newPayment.id);
 
     return newPayment;
   },
@@ -713,7 +653,6 @@ export const providerPaymentOps = {
       updatedAt: new Date().toISOString()
     };
 
-    // Update status based on amounts if not explicitly provided
     if (!updates.status) {
       if (updatedPayment.remainingAmount === 0) {
         updatedPayment.status = 'paid';
@@ -726,7 +665,6 @@ export const providerPaymentOps = {
 
     data.providerPayments[paymentIndex] = updatedPayment;
     await dataManager.saveData(data);
-    console.log('✅ Provider payment updated:', paymentId);
 
     return updatedPayment;
   },
@@ -741,7 +679,6 @@ export const providerPaymentOps = {
 
     data.providerPayments.splice(paymentIndex, 1);
     await dataManager.saveData(data);
-    console.log('✅ Provider payment deleted:', paymentId);
 
     return true;
   },
@@ -819,15 +756,10 @@ export const providerPaymentOps = {
   }
 };
 
-// ⚙️ Utility function to get all data
 export const getAppData = () => dataManager.loadData();
 
-// 🔄 Compatibility exports for jsonbin-simple.js consolidation
-
-// Export initializeAppData as alias for dataManager.loadData
 export const initializeAppData = () => dataManager.loadData();
 
-// Add compatibility aliases for existing methods
 authOps.getUser = async (userId) => {
   const data = await dataManager.loadData();
   const user = data.users?.find(u => u._id === userId);

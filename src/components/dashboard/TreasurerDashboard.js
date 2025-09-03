@@ -352,7 +352,10 @@ const TreasurerDashboard = () => {
             </div>
           </Link>
           
-          <button className="flex items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors group">
+          <Link
+            to="/dashboard/payments/reports"
+            className="flex items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors group"
+          >
             <div className="h-10 w-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
               <Calculator className="h-5 w-5 text-white" />
             </div>
@@ -360,7 +363,7 @@ const TreasurerDashboard = () => {
               <p className="text-sm font-medium text-gray-900">Financial Report</p>
               <p className="text-xs text-gray-500">Generate reports</p>
             </div>
-          </button>
+          </Link>
         </div>
       </div>
     </div>

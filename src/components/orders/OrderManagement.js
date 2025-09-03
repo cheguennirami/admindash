@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Edit,
+  Trash2
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { clientOps } from '../../services/jsonbin-new'; // Import local services
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
 const OrderManagement = () => {
-  // Remove unused user variable
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -76,6 +83,31 @@ const OrderManagement = () => {
       toast.error(errorMessage);
     }
   };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      console.log('🗑️ Deleting order:', orderId);
+      await clientOps.updateClient(orderId, { status: 'cancelled' });
+      toast.success('Order deleted successfully');
+      console.log('✅ Order deleted from JSONBin');
+      await fetchOrders(); // Refresh the list
+    } catch (error) {
+      console.error('❌ Error deleting order:', error);
+      toast.error('Failed to delete order');
+    }
+  };
+
+  const handleEditOrder = (orderId) => {
+    // Navigate to client edit page (since orders are clients)
+    navigate(`/dashboard/clients/${orderId}/edit`);
+  };
+
+  const canEdit = user?.role === 'logistics' || user?.role === 'super_admin';
+  const canDelete = user?.role === 'logistics' || user?.role === 'super_admin';
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -182,17 +214,39 @@ const OrderManagement = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <select
-                          value={order.status}
-                          onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                          className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                        >
-                          {orderStatuses.map((status) => (
-                            <option key={status} value={status}>
-                              {status.replace('_', ' ')}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-center space-x-4">
+                          <div className="min-w-0 flex-1">
+                            <select
+                              value={order.status}
+                              onChange={(e) => handleStatusChange(order._id, e.target.value)}
+                              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                            >
+                              {orderStatuses.map((status) => (
+                                <option key={status} value={status}>
+                                  {status.replace('_', ' ')}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {canEdit && (
+                            <button
+                              onClick={() => handleEditOrder(order._id)}
+                              className="p-1 text-indigo-600 hover:text-indigo-900"
+                              title="Edit order"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDeleteOrder(order._id)}
+                              className="p-1 text-red-600 hover:text-red-900"
+                              title="Delete order"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

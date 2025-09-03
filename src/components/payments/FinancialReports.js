@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import {
@@ -17,15 +17,136 @@ const FinancialReports = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  useEffect(() => {
-    fetchReports();
-  }, [dateRange, customStartDate, customEndDate]);
-
-  const fetchReports = () => {
+  const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
-      // TODO: Implement actual report fetching from contexts/services
-      // For now, set empty data structure
+      console.log('📥 Fetching financial reports data from JSONBin...');
+
+      // Import the payment operations
+      const { paymentOps } = await import('../../services/jsonbin-new');
+
+      // Get all payments data from JSONBin
+      const payments = await paymentOps.getPayments();
+      console.log(`✅ Fetched ${payments.length} transactions for reports`);
+
+      // Apply date filtering if custom range specified
+      let filteredPayments = payments;
+      if (dateRange === 'custom' && customStartDate && customEndDate) {
+        const startDate = new Date(customStartDate);
+        const endDate = new Date(customEndDate);
+        endDate.setHours(23, 59, 59, 999); // Include the entire end date
+
+        filteredPayments = payments.filter(payment => {
+          const paymentDate = new Date(payment.createdAt);
+          return paymentDate >= startDate && paymentDate <= endDate;
+        });
+        console.log(`📅 Filtered payments by custom date range: ${filteredPayments.length}`);
+      } else {
+        // Apply default filtering based on dateRange
+        const now = new Date();
+        let startDate;
+
+        switch (dateRange) {
+          case 'week':
+            startDate = new Date(now.setDate(now.getDate() - 7));
+            break;
+          case 'month':
+            startDate = new Date(now.setMonth(now.getMonth() - 1));
+            break;
+          case 'quarter':
+            startDate = new Date(now.setMonth(now.getMonth() - 3));
+            break;
+          case 'year':
+            startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+            break;
+          default:
+            startDate = new Date(0); // Beginning of time
+        }
+
+        if (dateRange !== 'custom') {
+          filteredPayments = payments.filter(payment =>
+            new Date(payment.createdAt) >= startDate
+          );
+        }
+      }
+
+      // Calculate summary statistics
+      const incomeData = filteredPayments.filter(p => p.type === 'income');
+      const expenseData = filteredPayments.filter(p => p.type === 'expense');
+
+      const totalIncome = incomeData.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const totalExpenses = expenseData.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const netProfit = totalIncome - totalExpenses;
+
+      // Category breakdown (only expenses for now)
+      const categoryBreakdown = expenseData.reduce((acc, payment) => {
+        const category = payment.category || 'Uncategorized';
+        const existing = acc.find(item => item.name === category);
+        if (existing) {
+          existing.value += payment.amount || 0;
+        } else {
+          acc.push({ name: category, value: payment.amount || 0 });
+        }
+        return acc;
+      }, []).sort((a, b) => b.value - a.value); // Sort by amount descending
+
+      // Recent transactions (last 10)
+      const recentTransactions = filteredPayments
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        .slice(0, 10)
+        .map(payment => ({
+          ...payment,
+          date: payment.createdAt
+        }));
+
+      // Calculate monthly trends
+      const monthlyTrends = filteredPayments.reduce((acc, payment) => {
+        const date = new Date(payment.createdAt);
+        const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+
+        if (!acc[monthYear]) {
+          acc[monthYear] = {
+            _id: {
+              year: date.getFullYear(),
+              month: date.getMonth() + 1
+            },
+            income: 0,
+            expenses: 0,
+            net: 0
+          };
+        }
+
+        if (payment.type === 'income') {
+          acc[monthYear].income += payment.amount || 0;
+        } else {
+          acc[monthYear].expenses += payment.amount || 0;
+        }
+        acc[monthYear].net = acc[monthYear].income - acc[monthYear].expenses;
+
+        return acc;
+      }, {});
+
+      const monthlyPayments = Object.values(monthlyTrends)
+        .sort((a, b) => `${a._id.year}-${a._id.month}`.localeCompare(`${b._id.year}-${b._id.month}`));
+
+      // Set the calculated data
+      setData({
+        summary: { totalIncome, totalExpenses, netProfit },
+        monthlyTrends: monthlyPayments,
+        categoryBreakdown,
+        paymentMethods: [], // TODO: Implement payment methods if needed
+        clientPayments: [],
+        overduePayments: [],
+        recentTransactions
+      });
+
+      console.log('✅ Financial reports generated successfully');
+
+    } catch (error) {
+      console.error('❌ Error fetching financial reports:', error);
+      toast.error('Failed to fetch financial reports');
+
+      // Set fallback empty data
       setData({
         summary: { totalIncome: 0, totalExpenses: 0, netProfit: 0 },
         monthlyTrends: [],
@@ -35,12 +156,14 @@ const FinancialReports = () => {
         overduePayments: [],
         recentTransactions: []
       });
-    } catch (error) {
-      console.error('Error fetching reports:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   const exportReport = async (format = 'pdf') => {
     try {
@@ -194,7 +317,7 @@ const FinancialReports = () => {
               data.categoryBreakdown.map((category, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-600">{category.name}</span>
-                  <span className="text-sm font-bold text-gray-900">{category.amount?.toFixed(2)} TND</span>
+                  <span className="text-sm font-bold text-gray-900">{category.value?.toFixed(2)} TND</span>
                 </div>
               ))
             ) : (

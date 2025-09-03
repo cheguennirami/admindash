@@ -5,18 +5,72 @@ import { ArrowLeft, Upload, X, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { clientOps } from '../../services/jsonbin-new'; // Import JSONBin client operations
+import { useAuth } from '../../contexts/AuthContext';
+
+// 🎯 FREE Cloud Options (Choose one)
+// Option 1: GitHub Pages (100% Free) - Store images using GitHub's free pages
+// Option 2: Imgur API (Free Tier) - Easy image hosting
+// Option 3: Cloudinary Free Tier - 25GB storage, 25GB monthly bandwidth
+
+// Cloud Configuration - UPDATE these URLs with your actual cloud accounts
+const GITHUB_PAGES_BASE = `https://${process.env.REACT_APP_GITHUB_USERNAME || 'your-username'}.github.io/${process.env.REACT_APP_GITHUB_REPO || 'your-repo'}/screenshots/`;
+const CLOUDINARY_CONFIG = {
+  uploadPreset: process.env.REACT_APP_CLOUDINARY_PRESET || 'shein_screenshots',
+  cloudName: process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dyguwxv2l'
+};
+
+// Cloudinary Upload Function (Alternative Option 2)
+const uploadToCloudinary = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+
+  try {
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`,
+      {
+        method: 'POST',
+        body: formData
+      }
+    );
+
+    const result = await response.json();
+
+    if (response.ok) {
+      return {
+        url: result.secure_url,
+        publicId: result.public_id,
+        filename: file.name
+      };
+    } else {
+      throw new Error(result.error?.message || 'Upload failed');
+    }
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    throw error;
+  }
+};
+
+// GitHub Pages Upload (Alternative Option 1)
+// Note: This requires manual upload to your GitHub repo
+const generateGitHubUrl = (clientId, filename, imageIndex) => {
+  const extension = filename.split('.').pop();
+  const cleanFilename = `${clientId}_${imageIndex}.${extension}`;
+  return `${GITHUB_PAGES_BASE}${cleanFilename}`;
+};
 
 const ClientForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { user } = useAuth();
   const isEdit = Boolean(id);
-  // Remove unused user variable
-  
+
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEdit);
   const [screenshots, setScreenshots] = useState([]);
   const [existingScreenshots, setExistingScreenshots] = useState([]);
-  
+  const [uploadMethod] = useState('cloudinary'); // 'cloudinary' or 'github'
+
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm();
 
   const fetchClient = useCallback(async () => {
@@ -92,18 +146,71 @@ const ClientForm = () => {
       console.log(`${isEdit ? '📝' : '🆕'} Saving client to JSONBin...`);
 
       // Prepare client data for JSONBin
-      const clientData = {
+      let clientData = {
         ...data,
         // Add additional fields that might be missing
         advanceAmount: data.sellingPrice * 0.3,
         remainingAmount: data.sellingPrice * 0.7,
         advancePaid: data.advancePaid || false,
         remainingPaid: data.remainingPaid || false,
-        // For now, we'll skip screenshots in database
-        screenshots: [],
         confirmation: data.confirmation || 'pending',
-        status: data.status || 'in_progress'
+        status: data.status || 'in_progress',
+        // Add user who created this client for activity tracking
+        createdBy: user ? {
+          _id: user._id,
+          fullName: user.full_name || user.email,
+          role: user.role
+        } : null
       };
+
+      // Handle screenshot uploads to cloud
+      const uploadedScreenshots = [];
+
+      if (screenshots.length > 0) {
+        console.log('📤 Uploading screenshots to cloud...');
+        const toastId = toast.loading('Uploading screenshots to cloud storage...');
+
+        for (let i = 0; i < screenshots.length; i++) {
+          const screenshot = screenshots[i];
+
+          try {
+            if (uploadMethod === 'cloudinary') {
+              const uploadResult = await uploadToCloudinary(screenshot.file);
+              uploadedScreenshots.push({
+                filename: screenshot.name,
+                url: uploadResult.url,
+                publicId: uploadResult.publicId,
+                uploadedAt: new Date().toISOString()
+              });
+            } else if (uploadMethod === 'github') {
+              // For GitHub, we'll generate the expected URL (manual upload to repo required)
+              const expectedUrl = generateGitHubUrl(id || `client-${Date.now()}`, screenshot.name, i);
+              uploadedScreenshots.push({
+                filename: screenshot.name,
+                url: expectedUrl,
+                method: 'github',
+                uploadedAt: new Date().toISOString()
+              });
+            }
+          } catch (error) {
+            console.error(`Failed to upload ${screenshot.name}:`, error);
+            toast.error(`Failed to upload ${screenshot.name}`);
+          }
+        }
+
+        if (uploadedScreenshots.length > 0) {
+          toast.dismiss(toastId);
+          toast.success(`${uploadedScreenshots.length} screenshots uploaded successfully!`);
+        } else {
+          toast.dismiss(toastId);
+        }
+      }
+
+      // Combine existing and new screenshots
+      clientData.screenshots = [
+        ...existingScreenshots,
+        ...uploadedScreenshots
+      ];
 
       if (isEdit) {
         await clientOps.updateClient(id, clientData);
