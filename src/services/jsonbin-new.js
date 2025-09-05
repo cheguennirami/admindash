@@ -10,6 +10,10 @@ const getEmptyData = () => ({
   payments: [],
   providerPayments: [],
   orders: [],
+  categories: {
+    expense: ['Office Supplies', 'Software & Tools', 'Marketing & Advertising', 'Utilities', 'Travel & Transport', 'Professional Services', 'Equipment', 'Miscellaneous'],
+    income: ['Business Assets', 'Service Fees', 'Consultation', 'Maintenance', 'Licenses', 'Commissions', 'Miscellaneous']
+  },
   settings: {
     initialized: true,
     version: "3.0.0"
@@ -310,8 +314,15 @@ export const authOps = {
 
 export const clientOps = {
   async getClients() {
-    const data = await dataManager.loadData();
-    return data.clients || [];
+    console.log('clientOps: getClients called.');
+    try {
+      const data = await dataManager.loadData();
+      console.log('clientOps: getClients - Data loaded. Clients count:', data.clients?.length || 0);
+      return data.clients || [];
+    } catch (error) {
+      console.error('clientOps: getClients - Error loading data:', error);
+      throw error;
+    }
   },
 
   async createClient(clientData) {
@@ -756,6 +767,28 @@ export const providerPaymentOps = {
   }
 };
 
+export const categoryOps = {
+  async getCategories() {
+    const data = await dataManager.loadData();
+    return data.categories || { expense: [], income: [] };
+  },
+
+  async addCategory(type, categoryName) {
+    const data = await dataManager.loadData();
+    if (!data.categories) {
+      data.categories = { expense: [], income: [] };
+    }
+    if (!data.categories[type]) {
+      data.categories[type] = [];
+    }
+    if (!data.categories[type].includes(categoryName)) {
+      data.categories[type].push(categoryName);
+      await dataManager.saveData(data);
+    }
+    return data.categories[type];
+  }
+};
+
 export const getAppData = () => dataManager.loadData();
 
 export const initializeAppData = () => dataManager.loadData();
@@ -790,8 +823,18 @@ clientOps.addClient = async (clientData) => {
 };
 
 clientOps.getClient = async (clientId) => {
-  const clients = await clientOps.getClients();
-  const client = clients.find(c => c._id === clientId);
-  if (!client) throw new Error('Client not found');
-  return client;
+  console.log('clientOps: getClient called with ID:', clientId);
+  try {
+    const clients = await clientOps.getClients();
+    const client = clients.find(c => c._id === clientId);
+    if (!client) {
+      console.warn('clientOps: getClient - Client not found for ID:', clientId);
+      throw new Error('Client not found');
+    }
+    console.log('clientOps: getClient - Found client:', client.fullName);
+    return client;
+  } catch (error) {
+    console.error('clientOps: getClient - Error fetching client:', error);
+    throw error;
+  }
 };

@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Edit,
-  Trash2
+  Trash2,
+  Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { clientOps } from '../../services/jsonbin-new'; // Import local services
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 const OrderManagement = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
@@ -41,6 +44,10 @@ const OrderManagement = () => {
         filteredClients = clients.filter(client => client.status === statusFilter);
       }
 
+      if (user?.role === 'logistics') {
+        filteredClients = filteredClients.filter(client => client.status === 'delivered_to_france');
+      }
+
       // Simple pagination (just in-memory for now)
       const startIndex = (currentPage - 1) * 10;
       const endIndex = startIndex + 10;
@@ -59,12 +66,12 @@ const OrderManagement = () => {
       setStatusCounts(statusCount);
 
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch orders.';
+      const errorMessage = err.message || t('failed_to_fetch_orders');
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, statusFilter]);
+  }, [currentPage, statusFilter, t]);
 
   useEffect(() => {
     fetchOrders();
@@ -75,35 +82,74 @@ const OrderManagement = () => {
       setError('');
       // Update client status (clients are treated as orders)
       clientOps.updateClient(orderId, { status: newStatus });
-      toast.success('Order status updated successfully');
+      toast.success(t('order_status_updated_successfully'));
       fetchOrders(); // Re-fetch orders to update the list
     } catch (err) {
-      const errorMessage = err.message || 'Failed to update order status.';
+      const errorMessage = err.message || t('failed_to_update_order_status');
       setError(errorMessage);
       toast.error(errorMessage);
     }
   };
 
   const handleDeleteOrder = async (orderId) => {
-    if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+    if (!window.confirm(t('confirm_delete_order'))) {
       return;
     }
 
     try {
       console.log('🗑️ Deleting order:', orderId);
       await clientOps.updateClient(orderId, { status: 'cancelled' });
-      toast.success('Order deleted successfully');
+      toast.success(t('order_deleted_successfully'));
       console.log('✅ Order deleted from JSONBin');
       await fetchOrders(); // Refresh the list
     } catch (error) {
       console.error('❌ Error deleting order:', error);
-      toast.error('Failed to delete order');
+      toast.error(t('failed_to_delete_order'));
     }
   };
 
   const handleEditOrder = (orderId) => {
     // Navigate to client edit page (since orders are clients)
     navigate(`/dashboard/clients/${orderId}/edit`);
+  };
+
+  const handleExportOrders = async () => {
+    try {
+      const allClients = await clientOps.getClients();
+      const headers = [
+        t('order_id'), t('client_name'), t('phone_number'), t('selling_price'), t('buying_price'),
+        t('advance_amount'), t('remaining_amount'), t('status'), t('confirmation'), t('created_at')
+      ];
+      const csvRows = [headers.join(',')];
+
+      allClients.forEach(client => {
+        csvRows.push([
+          client.orderId,
+          client.fullName,
+          client.phoneNumber,
+          client.sellingPrice,
+          client.buyingPrice,
+          client.advanceAmount,
+          client.remainingAmount,
+          client.status,
+          client.confirmation,
+          new Date(client.createdAt).toLocaleDateString()
+        ].map(field => `"${field}"`).join(','));
+      });
+
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', 'orders_export.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success(t('orders_exported_successfully'));
+    } catch (error) {
+      console.error('Error exporting orders:', error);
+      toast.error(t('failed_to_export_orders'));
+    }
   };
 
   const canEdit = user?.role === 'logistics' || user?.role === 'super_admin';
@@ -129,34 +175,43 @@ const OrderManagement = () => {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Order Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">{t('order_management')}</h1>
         <p className="text-gray-600 mb-6">
-          Track and manage order status throughout the delivery process.
+          {t('track_and_manage_order_status')}
         </p>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         {/* Status Filters and Counts */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          <button
-            onClick={() => setStatusFilter('')}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              statusFilter === '' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            All Orders ({Object.values(statusCounts).reduce((sum, count) => sum + count, 0)})
-          </button>
-          {orderStatuses.map((status) => (
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex flex-wrap gap-2">
             <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
+              onClick={() => setStatusFilter('')}
               className={`px-4 py-2 rounded-md text-sm font-medium ${
-                statusFilter === status ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                statusFilter === '' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              {status.replace('_', ' ')} ({statusCounts[status] || 0})
+              {t('all_orders')} ({Object.values(statusCounts).reduce((sum, count) => sum + count, 0)})
             </button>
-          ))}
+            {orderStatuses.map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  statusFilter === status ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {t(status.replace('_', ' '))} ({statusCounts[status] || 0})
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleExportOrders}
+            className="flex items-center px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {t('export_orders')}
+          </button>
         </div>
 
         {loading ? (
@@ -167,22 +222,22 @@ const OrderManagement = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Order ID
+                    {t('order_id')}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Client Name
+                    {t('client_name')}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Phone
+                    {t('phone')}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Selling Price
+                    {t('selling_price')}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    {t('status')}
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    {t('actions')}
                   </th>
                 </tr>
               </thead>
@@ -190,7 +245,7 @@ const OrderManagement = () => {
                 {orders.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                      No orders found.
+                      {t('no_orders_found')}
                     </td>
                   </tr>
                 ) : (
@@ -210,7 +265,7 @@ const OrderManagement = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status.replace('_', ' ')}
+                          {t(order.status.replace('_', ' '))}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -223,7 +278,7 @@ const OrderManagement = () => {
                             >
                               {orderStatuses.map((status) => (
                                 <option key={status} value={status}>
-                                  {status.replace('_', ' ')}
+                                  {t(status.replace('_', ' '))}
                                 </option>
                               ))}
                             </select>
@@ -232,7 +287,7 @@ const OrderManagement = () => {
                             <button
                               onClick={() => handleEditOrder(order._id)}
                               className="p-1 text-indigo-600 hover:text-indigo-900"
-                              title="Edit order"
+                              title={t('edit_order')}
                             >
                               <Edit className="h-4 w-4" />
                             </button>
@@ -241,7 +296,7 @@ const OrderManagement = () => {
                             <button
                               onClick={() => handleDeleteOrder(order._id)}
                               className="p-1 text-red-600 hover:text-red-900"
-                              title="Delete order"
+                              title={t('delete_order')}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -265,20 +320,20 @@ const OrderManagement = () => {
                 disabled={currentPage === 1}
                 className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
               >
-                Previous
+                {t('previous')}
               </button>
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
                 className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
               >
-                Next
+                {t('next')}
               </button>
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Page <span className="font-medium">{currentPage}</span> of{' '}
+                  {t('page')} <span className="font-medium">{currentPage}</span> {t('of')}{' '}
                   <span className="font-medium">{totalPages}</span>
                 </p>
               </div>

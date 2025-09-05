@@ -7,7 +7,8 @@ import {
   Filter,
   CreditCard,
   Edit,
-  Trash2
+  Trash2,
+  Printer
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { paymentOps } from '../../services/jsonbin-new';
@@ -143,6 +144,65 @@ const PaymentsList = () => {
     } catch {
       toast.error('Export failed');
     }
+  };
+
+  const handlePrintReceipt = (payment) => {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Receipt - ${payment.description}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 20px; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+            h1 { text-align: center; color: #007bff; margin-bottom: 30px; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header img { max-width: 150px; margin-bottom: 10px; }
+            .details p { margin: 5px 0; }
+            .details strong { display: inline-block; width: 120px; }
+            .amount { font-size: 2em; text-align: center; margin: 30px 0; color: ${payment.type === 'income' ? '#28a745' : '#dc3545'}; }
+            .footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #777; }
+            .footer p { margin: 3px 0; }
+            .type-badge {
+              display: inline-block;
+              padding: 4px 8px;
+              border-radius: 12px;
+              font-size: 0.8em;
+              font-weight: bold;
+              color: white;
+              background-color: ${payment.type === 'income' ? '#28a745' : '#dc3545'};
+              margin-left: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Payment Receipt</h1>
+              <p><strong>Date:</strong> ${new Date(payment.createdAt).toLocaleDateString()}</p>
+            </div>
+            <div class="details">
+              <p><strong>Description:</strong> ${payment.description}</p>
+              <p><strong>Category:</strong> ${payment.category || 'N/A'}</p>
+              <p><strong>Type:</strong> ${payment.type} <span class="type-badge">${payment.type.toUpperCase()}</span></p>
+              ${payment.orderId ? `<p><strong>Order ID:</strong> ${payment.orderId}</p>` : ''}
+              ${payment.notes ? `<p><strong>Notes:</strong> ${payment.notes}</p>` : ''}
+              ${payment.type === 'expense' && payment.userName ? `<p><strong>Paid By:</strong> ${payment.userName} (${payment.userRole})</p>` : ''}
+              ${payment.type === 'income' && payment.clientName ? `<p><strong>Received From:</strong> ${payment.clientName} (${payment.clientEmail || 'No Email'})</p>` : ''}
+            </div>
+            <div class="amount">
+              ${payment.type === 'income' ? '+' : '-'}${payment.amount ? payment.amount.toLocaleString() : '0'} TND
+            </div>
+            <div class="footer">
+              <p>Thank you for your business!</p>
+              <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   return (
@@ -319,6 +379,13 @@ const PaymentsList = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handlePrintReceipt(payment)}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Print receipt"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
                           <button
                             onClick={() => handleEdit(payment)}
                             className="text-blue-600 hover:text-blue-900"

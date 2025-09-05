@@ -8,6 +8,8 @@ import Login from './components/auth/Login';
 import Dashboard from './components/dashboard/Dashboard';
 import Layout from './components/layout/Layout';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n'; // Import the i18n configuration
 
 // React Router v7 Future Flags for compatibility
 const routerOpts = {
@@ -63,36 +65,36 @@ function AppContent() {
             },
           }}
         />
-        
+
         <Routes>
-          <Route 
-            path="/login" 
+          <Route
+            path="/login"
             element={
               <PublicRoute>
                 <Login />
               </PublicRoute>
-            } 
+            }
           />
           
-          <Route 
-            path="/dashboard/*" 
+          <Route
+            path="/dashboard/*"
             element={
               <ProtectedRoute>
                 <Layout>
                   <Dashboard />
                 </Layout>
               </ProtectedRoute>
-            } 
+            }
           />
           
-          <Route 
-            path="/" 
-            element={<Navigate to="/dashboard" />} 
+          <Route
+            path="/"
+            element={<Navigate to="/dashboard" />}
           />
           
-          <Route 
-            path="*" 
-            element={<Navigate to="/dashboard" />} 
+          <Route
+            path="*"
+            element={<Navigate to="/dashboard" />}
           />
         </Routes>
       </div>
@@ -102,13 +104,15 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <ClientProvider>
-        <PaymentProvider>
-          <AppContent />
-        </PaymentProvider>
-      </ClientProvider>
-    </AuthProvider>
+    <I18nextProvider i18n={i18n}>
+      <AuthProvider>
+        <ClientProvider>
+          <PaymentProvider>
+            <AppContent />
+          </PaymentProvider>
+        </ClientProvider>
+      </AuthProvider>
+    </I18nextProvider>
   );
 }
 

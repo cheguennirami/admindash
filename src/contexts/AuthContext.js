@@ -76,7 +76,8 @@ export const AuthProvider = ({ children }) => {
         _id: userData._id,
         email: userData.email,
         role: userData.role,
-        full_name: userData.full_name
+        fullName: userData.fullName, // Changed from full_name to fullName for consistency
+        phone: userData.phone || '' // Include phone number
       };
 
       const token = generateToken(userData._id);
@@ -118,9 +119,11 @@ export const AuthProvider = ({ children }) => {
 
       // Update user in JSONBin database
       const updatedUser = await authOps.updateUser(user._id, profileData);
-
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      // Ensure the user object in state is fully updated with all fields, not just the ones passed in profileData
+      const fullUpdatedUser = { ...user, ...updatedUser };
+      setUser(fullUpdatedUser);
+      localStorage.setItem('user', JSON.stringify(fullUpdatedUser));
 
       toast.success('Profile updated successfully');
       return { success: true };

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Upload, X, Save } from 'lucide-react';
+import { ArrowLeft, Upload, X, Save, PlusCircle, MinusCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { clientOps } from '../../services/jsonbin-new'; // Import JSONBin client operations
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 // 🎯 FREE Cloud Options (Choose one)
 // Option 1: GitHub Pages (100% Free) - Store images using GitHub's free pages
@@ -60,6 +61,7 @@ const generateGitHubUrl = (clientId, filename, imageIndex) => {
 };
 
 const ClientForm = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
@@ -71,7 +73,39 @@ const ClientForm = () => {
   const [existingScreenshots, setExistingScreenshots] = useState([]);
   const [uploadMethod] = useState('cloudinary'); // 'cloudinary' or 'github'
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm();
+  const { register, handleSubmit, formState: { errors }, setValue, watch, control } = useForm({
+   defaultValues: {
+     articles: [{ amount: 0, buyingPriceMultiplier: 1, sellingPriceMultiplier: 1.0 }],
+     totalBuyingPrice: 0,
+     totalSellingPrice: 0
+   }
+ });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "articles"
+  });
+
+  const articles = watch('articles');
+  const totalBuyingPrice = watch('totalBuyingPrice');
+  const totalSellingPrice = watch('totalSellingPrice');
+  const fraisDeBagage = watch('fraisDeBagage'); // Watch fraisDeBagage
+
+  useEffect(() => {
+    const calculatedTotalBuyingPrice = articles.reduce((sum, article) => {
+      return sum + (parseFloat(article.amount || 0) * parseFloat(article.buyingPriceMultiplier || 1));
+    }, 0);
+    setValue('totalBuyingPrice', calculatedTotalBuyingPrice.toFixed(2));
+  }, [articles, setValue]);
+
+  useEffect(() => {
+    const calculatedTotalSellingPrice = articles.reduce((sum, article) => {
+      // Selling price should be article amount * selling price multiplier
+      return sum + (parseFloat(article.amount || 0) * parseFloat(article.sellingPriceMultiplier || 1));
+    }, 0);
+    // Add fraisDeBagage to the total selling price
+    setValue('totalSellingPrice', (calculatedTotalSellingPrice + parseFloat(fraisDeBagage || 0)).toFixed(2));
+  }, [articles, fraisDeBagage, setValue]); // Add fraisDeBagage to dependency array
 
   const fetchClient = useCallback(async () => {
     try {
@@ -84,8 +118,12 @@ const ClientForm = () => {
       if (client) {
         console.log('✅ Client found in JSONBin:', client.full_name);
         // Set form values
+        // Set form values
         Object.keys(client).forEach(key => {
-          if (key !== 'screenshots') {
+          if (key === 'articles') {
+            // Ensure articles are correctly set for useFieldArray
+            client.articles.forEach(article => append(article));
+          } else if (key !== 'screenshots') {
             setValue(key, client[key]);
           }
         });
@@ -93,17 +131,17 @@ const ClientForm = () => {
         setExistingScreenshots(client.screenshots || []);
       } else {
         console.error('❌ Client not found:', id);
-        toast.error('Client not found');
+        toast.error(t('client_not_found'));
         navigate('/dashboard/clients');
       }
     } catch (error) {
       console.error('❌ Error fetching client:', error);
-      toast.error('Failed to fetch client data');
+      toast.error(t('failed_to_fetch_client_data'));
       navigate('/dashboard/clients');
     } finally {
       setInitialLoading(false);
     }
-  }, [id, setValue, navigate]);
+  }, [id, setValue, navigate, t, append]);
 
   useEffect(() => {
     if (isEdit) {
@@ -114,7 +152,7 @@ const ClientForm = () => {
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length + screenshots.length + existingScreenshots.length > 5) {
-      toast.error('Maximum 5 screenshots allowed');
+      toast.error(t('maximum_5_screenshots_allowed'));
       return;
     }
 
@@ -149,18 +187,22 @@ const ClientForm = () => {
       let clientData = {
         ...data,
         // Add additional fields that might be missing
-        advanceAmount: data.sellingPrice * 0.3,
-        remainingAmount: data.sellingPrice * 0.7,
+        advanceAmount: data.totalSellingPrice * 0.3,
+        remainingAmount: data.totalSellingPrice * 0.7,
         advancePaid: data.advancePaid || false,
         remainingPaid: data.remainingPaid || false,
         confirmation: data.confirmation || 'pending',
         status: data.status || 'in_progress',
+        articles: data.articles, // Include articles array
+        buyingPrice: data.totalBuyingPrice, // Store total buying price
+        sellingPrice: data.totalSellingPrice, // Store total selling price
         // Add user who created this client for activity tracking
         createdBy: user ? {
           _id: user._id,
           fullName: user.full_name || user.email,
           role: user.role
-        } : null
+        } : null,
+        fraisDeBagage: data.fraisDeBagage || 0
       };
 
       // Handle screenshot uploads to cloud
@@ -194,13 +236,13 @@ const ClientForm = () => {
             }
           } catch (error) {
             console.error(`Failed to upload ${screenshot.name}:`, error);
-            toast.error(`Failed to upload ${screenshot.name}`);
+            toast.error(t('failed_to_upload_screenshot', { name: screenshot.name }));
           }
         }
 
         if (uploadedScreenshots.length > 0) {
           toast.dismiss(toastId);
-          toast.success(`${uploadedScreenshots.length} screenshots uploaded successfully!`);
+          toast.success(t('screenshots_uploaded_successfully', { count: uploadedScreenshots.length }));
         } else {
           toast.dismiss(toastId);
         }
@@ -214,18 +256,18 @@ const ClientForm = () => {
 
       if (isEdit) {
         await clientOps.updateClient(id, clientData);
-        toast.success('Client updated successfully');
+        toast.success(t('client_updated_successfully'));
         console.log('✅ Client updated in JSONBin:', id);
       } else {
         const newClient = await clientOps.createClient(clientData);
-        toast.success('Client created successfully');
+        toast.success(t('client_created_successfully'));
         console.log('✅ Client created in JSONBin:', newClient._id);
       }
 
       navigate('/dashboard/clients');
     } catch (error) {
       console.error('❌ Error saving client:', error);
-      const message = error.message || `Failed to ${isEdit ? 'update' : 'create'} client`;
+      const message = error.message || t(isEdit ? 'failed_to_update_client' : 'failed_to_create_client');
       toast.error(message);
     } finally {
       setLoading(false);
@@ -252,10 +294,10 @@ const ClientForm = () => {
         </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isEdit ? 'Edit Client' : 'Add New Client'}
+            {isEdit ? t('edit_client') : t('add_new_client')}
           </h1>
           <p className="text-gray-600 mt-1">
-            {isEdit ? 'Update client information' : 'Create a new client order'}
+            {isEdit ? t('update_client_information') : t('create_new_client_order')}
           </p>
         </div>
       </div>
@@ -263,19 +305,19 @@ const ClientForm = () => {
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Client Information</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">{t('client_information')}</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Full Name */}
             <div>
-              <label className="form-label">Full Name *</label>
+              <label className="form-label">{t('full_name')} *</label>
               <input
                 type="text"
                 className={`form-input ${errors.fullName ? 'border-red-500' : ''}`}
-                placeholder="Enter client's full name"
+                placeholder={t('enter_client_full_name')}
                 {...register('fullName', {
-                  required: 'Full name is required',
-                  minLength: { value: 2, message: 'Name must be at least 2 characters' }
+                  required: t('full_name_required'),
+                  minLength: { value: 2, message: t('name_min_length', { count: 2 }) }
                 })}
               />
               {errors.fullName && (
@@ -285,14 +327,14 @@ const ClientForm = () => {
 
             {/* Phone Number */}
             <div>
-              <label className="form-label">Phone Number *</label>
+              <label className="form-label">{t('phone_number')} *</label>
               <input
                 type="tel"
                 className={`form-input ${errors.phoneNumber ? 'border-red-500' : ''}`}
-                placeholder="Enter phone number"
+                placeholder={t('enter_phone_number')}
                 {...register('phoneNumber', {
-                  required: 'Phone number is required',
-                  minLength: { value: 8, message: 'Phone number must be at least 8 digits' }
+                  required: t('phone_number_required'),
+                  minLength: { value: 8, message: t('phone_number_min_length', { count: 8 }) }
                 })}
               />
               {errors.phoneNumber && (
@@ -302,14 +344,14 @@ const ClientForm = () => {
 
             {/* Address */}
             <div className="md:col-span-2">
-              <label className="form-label">Address *</label>
+              <label className="form-label">{t('address')} *</label>
               <textarea
                 rows={3}
                 className={`form-input ${errors.address ? 'border-red-500' : ''}`}
-                placeholder="Enter full address"
+                placeholder={t('enter_full_address')}
                 {...register('address', {
-                  required: 'Address is required',
-                  minLength: { value: 5, message: 'Address must be at least 5 characters' }
+                  required: t('address_required'),
+                  minLength: { value: 5, message: t('address_min_length', { count: 5 }) }
                 })}
               />
               {errors.address && (
@@ -321,56 +363,128 @@ const ClientForm = () => {
 
         {/* Order Details */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Order Details</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">{t('order_details')}</h3>
+          
+          <div className="space-y-6">
+            {fields.map((item, index) => (
+              <div key={item.id} className="p-4 border border-gray-200 rounded-lg space-y-4 relative">
+                <h4 className="text-md font-semibold text-gray-800 mb-3">{t('article')} #{index + 1}</h4>
+                {fields.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => remove(index)}
+                    className="absolute top-2 right-2 p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200"
+                  >
+                    <MinusCircle className="h-5 w-5" />
+                  </button>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Article Amount */}
+                  <div>
+                    <label className="form-label">{t('article_amount')} *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className={`form-input ${errors.articles?.[index]?.amount ? 'border-red-500' : ''}`}
+                      placeholder="0.00"
+                      {...register(`articles.${index}.amount`, {
+                        required: t('article_amount_required'),
+                        min: { value: 0, message: t('amount_cannot_be_negative') }
+                      })}
+                    />
+                    {errors.articles?.[index]?.amount && (
+                      <p className="text-red-500 text-sm mt-1">{errors.articles[index].amount.message}</p>
+                    )}
+                  </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Buying Price */}
-            <div>
-              <label className="form-label">Buying Price (TND) *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className={`form-input ${errors.buyingPrice ? 'border-red-500' : ''}`}
-                placeholder="0.00"
-                {...register('buyingPrice', {
-                  required: 'Buying price is required',
-                  min: { value: 0, message: 'Price cannot be negative' }
-                })}
-              />
-              {errors.buyingPrice && (
-                <p className="text-red-500 text-sm mt-1">{errors.buyingPrice.message}</p>
-              )}
-            </div>
+                  {/* Buying Price Multiplier */}
+                  <div>
+                    <label className="form-label">{t('buying_price_multiplier')} *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className={`form-input ${errors.articles?.[index]?.buyingPriceMultiplier ? 'border-red-500' : ''}`}
+                      placeholder="1.00"
+                      {...register(`articles.${index}.buyingPriceMultiplier`, {
+                        required: t('multiplier_required'),
+                        min: { value: 0, message: t('multiplier_cannot_be_negative') }
+                      })}
+                    />
+                    {errors.articles?.[index]?.buyingPriceMultiplier && (
+                      <p className="text-red-500 text-sm mt-1">{errors.articles[index].buyingPriceMultiplier.message}</p>
+                    )}
+                  </div>
 
-            {/* Selling Price */}
-            <div>
-              <label className="form-label">Selling Price (TND) *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className={`form-input ${errors.sellingPrice ? 'border-red-500' : ''}`}
-                placeholder="0.00"
-                {...register('sellingPrice', {
-                  required: 'Selling price is required',
-                  min: { value: 0, message: 'Price cannot be negative' }
-                })}
-              />
-              {errors.sellingPrice && (
-                <p className="text-red-500 text-sm mt-1">{errors.sellingPrice.message}</p>
-              )}
+                  {/* Selling Price Multiplier */}
+                  <div>
+                    <label className="form-label">{t('selling_price_multiplier')} *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className={`form-input ${errors.articles?.[index]?.sellingPriceMultiplier ? 'border-red-500' : ''}`}
+                      placeholder="1.00"
+                      {...register(`articles.${index}.sellingPriceMultiplier`, {
+                        required: t('multiplier_required'),
+                        min: { value: 0, message: t('multiplier_cannot_be_negative') }
+                      })}
+                    />
+                    {errors.articles?.[index]?.sellingPriceMultiplier && (
+                      <p className="text-red-500 text-sm mt-1">{errors.articles[index].sellingPriceMultiplier.message}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => append({ amount: 0, buyingPriceMultiplier: 1, sellingPriceMultiplier: 1.0 })}
+              className="btn-outline flex items-center justify-center w-full mt-4"
+            >
+              <PlusCircle className="h-5 w-5 mr-2" />
+              {t('add_article')}
+            </button>
+
+            {/* Total Calculated Prices */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-4 border-t border-gray-200">
+              <div>
+                <label className="form-label">{t('total_buying_price')} (TND)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-input bg-gray-100 cursor-not-allowed"
+                  value={totalBuyingPrice}
+                  readOnly
+                  {...register('totalBuyingPrice')}
+                />
+              </div>
+              <div>
+                <label className="form-label">{t('total_selling_price')} (TND)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-input bg-gray-100 cursor-not-allowed"
+                  value={totalSellingPrice}
+                  readOnly
+                  {...register('totalSellingPrice')}
+                />
+              </div>
             </div>
 
             {/* Cart */}
             <div>
-              <label className="form-label">Cart Information *</label>
+              <label className="form-label">{t('cart_information')} *</label>
               <input
                 type="text"
                 className={`form-input ${errors.cart ? 'border-red-500' : ''}`}
-                placeholder="Cart details"
+                placeholder={t('cart_details')}
                 {...register('cart', {
-                  required: 'Cart information is required'
+                  required: t('cart_information_required')
                 })}
               />
               {errors.cart && (
@@ -380,20 +494,20 @@ const ClientForm = () => {
 
             {/* Confirmation */}
             <div>
-              <label className="form-label">Confirmation Status</label>
+              <label className="form-label">{t('confirmation_status')}</label>
               <select
                 className="form-input"
                 {...register('confirmation')}
               >
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="pending">{t('pending')}</option>
+                <option value="confirmed">{t('confirmed')}</option>
+                <option value="cancelled">{t('cancelled')}</option>
               </select>
             </div>
 
             {/* Advance Payment Status */}
             <div>
-              <label className="form-label">Advance Payment (30%)</label>
+              <label className="form-label">{t('advance_payment')} (30%)</label>
               <div className="space-y-2">
                 <div className="flex items-center">
                   <input
@@ -403,18 +517,18 @@ const ClientForm = () => {
                     {...register('advancePaid')}
                   />
                   <label htmlFor="advancePaid" className="ml-2 block text-sm text-gray-900">
-                    Advance Paid
+                    {t('advance_paid')}
                   </label>
                 </div>
                 <div className="text-sm text-gray-500">
-                  Amount: {watch('sellingPrice') ? (watch('sellingPrice') * 0.3).toFixed(2) : '0.00'} TND
+                  {t('amount')}: {watch('sellingPrice') ? (watch('sellingPrice') * 0.3).toFixed(2) : '0.00'} TND
                 </div>
               </div>
             </div>
 
             {/* Remaining Payment Status */}
             <div>
-              <label className="form-label">Remaining Payment (70%)</label>
+              <label className="form-label">{t('remaining_payment')} (70%)</label>
               <div className="space-y-2">
                 <div className="flex items-center">
                   <input
@@ -424,41 +538,53 @@ const ClientForm = () => {
                     {...register('remainingPaid')}
                   />
                   <label htmlFor="remainingPaid" className="ml-2 block text-sm text-gray-900">
-                    Remaining Paid
+                    {t('remaining_paid')}
                   </label>
                 </div>
                 <div className="text-sm text-gray-500">
-                  Amount: {watch('sellingPrice') ? (watch('sellingPrice') * 0.7).toFixed(2) : '0.00'} TND
+                  {t('amount')}: {watch('sellingPrice') ? (watch('sellingPrice') * 0.7).toFixed(2) : '0.00'} TND
                 </div>
               </div>
             </div>
 
             {/* Description */}
             <div className="md:col-span-2">
-              <label className="form-label">Description</label>
+              <label className="form-label">{t('description')}</label>
               <textarea
                 rows={4}
                 className="form-input"
-                placeholder="Additional notes or description"
+                placeholder={t('additional_notes_or_description')}
                 {...register('description')}
               />
             </div>
+          </div>
+          {/* Frais de bagage */}
+          <div>
+            <label className="form-label">{t('frais_de_bagage')} (TND)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className={`form-input`}
+              placeholder="0.00"
+              {...register('fraisDeBagage')}
+            />
           </div>
         </div>
 
         {/* Screenshots */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Screenshots</h3>
-
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">{t('screenshots')}</h3>
+          
           {/* File Upload */}
           <div className="mb-6">
-            <label className="form-label">Upload Screenshots (Max 5)</label>
+            <label className="form-label">{t('upload_screenshots')} (Max 5)</label>
             <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
               <div className="space-y-1 text-center">
                 <Upload className="mx-auto h-12 w-12 text-gray-400" />
                 <div className="flex text-sm text-gray-600">
                   <label className="relative cursor-pointer bg-white rounded-md font-medium text-pink-600 hover:text-pink-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-pink-500">
-                    <span>Upload files</span>
+                    <span>{t('upload_files')}</span>
                     <input
                       type="file"
                       multiple
@@ -467,9 +593,9 @@ const ClientForm = () => {
                       className="sr-only"
                     />
                   </label>
-                  <p className="pl-1">or drag and drop</p>
+                  <p className="pl-1">{t('or_drag_and_drop')}</p>
                 </div>
-                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB each</p>
+                <p className="text-xs text-gray-500">{t('png_jpg_gif_up_to_5mb_each')}</p>
               </div>
             </div>
           </div>
@@ -477,7 +603,7 @@ const ClientForm = () => {
           {/* Existing Screenshots */}
           {existingScreenshots.length > 0 && (
             <div className="mb-6">
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Existing Screenshots</h4>
+              <h4 className="text-sm font-medium text-gray-900 mb-3">{t('existing_screenshots')}</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {existingScreenshots.map((screenshot, index) => (
                   <div key={index} className="relative group">
@@ -502,7 +628,7 @@ const ClientForm = () => {
           {/* New Screenshots Preview */}
           {screenshots.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-3">New Screenshots</h4>
+              <h4 className="text-sm font-medium text-gray-900 mb-3">{t('new_screenshots')}</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {screenshots.map((screenshot, index) => (
                   <div key={index} className="relative group">
@@ -532,7 +658,7 @@ const ClientForm = () => {
             onClick={() => navigate('/dashboard/clients')}
             className="btn-outline"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             type="submit"
@@ -542,12 +668,12 @@ const ClientForm = () => {
             {loading ? (
               <>
                 <LoadingSpinner size="sm" className="mr-2" />
-                {isEdit ? 'Updating...' : 'Creating...'}
+                {isEdit ? t('updating') : t('creating')}...
               </>
             ) : (
               <>
                 <Save className="h-5 w-5 mr-2" />
-                {isEdit ? 'Update Client' : 'Create Client'}
+                {isEdit ? t('update_client') : t('create_client')}
               </>
             )}
           </button>

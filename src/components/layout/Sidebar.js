@@ -8,54 +8,63 @@ import {
   DollarSign,
   Settings,
   LogOut,
-  X
+  X,
+  Calculator // Added for Financial Report
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import sheinLogo from '../../assets/shein-logo.png';
+import { useTranslation } from 'react-i18next';
 
 const Sidebar = ({ isOpen, onClose, user }) => {
   const { logout } = useAuth();
   const location = useLocation();
+  const { t } = useTranslation();
 
   const navigation = [
     {
-      name: 'Dashboard',
+      name: t('dashboard'),
       href: '/dashboard',
       icon: LayoutDashboard,
       roles: ['super_admin', 'marketing', 'logistics', 'treasurer']
     },
     {
-      name: 'User Management',
+      name: t('user_management'),
       href: '/dashboard/users',
       icon: Users,
       roles: ['super_admin']
     },
     {
-      name: 'Clients',
+      name: t('clients'),
       href: '/dashboard/clients',
       icon: ShoppingCart,
       roles: ['super_admin', 'marketing', 'logistics']
     },
     {
-      name: 'Orders',
+      name: t('orders'),
       href: '/dashboard/orders',
       icon: Truck,
       roles: ['super_admin', 'logistics']
     },
     {
-      name: 'France Logistics',
+      name: t('france_logistics'),
       href: '/dashboard/logistics',
       icon: Truck,
       roles: ['super_admin', 'logistics']
     },
     {
-      name: 'Payments',
-      href: '/dashboard/payments',
+      name: t('payments'),
+      href: '/dashboard/payments/overview', // Changed to overview
       icon: DollarSign,
       roles: ['super_admin', 'treasurer']
     },
     {
-      name: 'Settings',
+      name: t('financial_report'), // New item for Financial Report
+      href: '/dashboard/payments/reports',
+      icon: Calculator,
+      roles: ['super_admin', 'treasurer']
+    },
+    {
+      name: t('settings'),
       href: '/dashboard/settings',
       icon: Settings,
       roles: ['super_admin', 'marketing', 'logistics', 'treasurer']
@@ -101,7 +110,7 @@ const Sidebar = ({ isOpen, onClose, user }) => {
               </div>
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  Welcome back,
+                  {t('welcome_back_sidebar')}
                 </p>
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {user?.fullName} 😊
@@ -144,7 +153,7 @@ const Sidebar = ({ isOpen, onClose, user }) => {
               className="group flex items-center w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors duration-200"
             >
               <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-red-500" />
-              Sign Out
+              {t('sign_out')}
             </button>
           </div>
         </div>
@@ -186,10 +195,10 @@ const Sidebar = ({ isOpen, onClose, user }) => {
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-900">
-                  Welcome back, {user?.fullName} 😊
+                  {t('welcome_back_sidebar_mobile', { name: user?.fullName })} 😊
                 </p>
                 <p className="text-xs text-gray-600 capitalize">
-                  {user?.role?.replace('_', ' ')}
+                  {t(user?.role?.replace('_', ' '))}
                 </p>
               </div>
             </div>
@@ -230,7 +239,7 @@ const Sidebar = ({ isOpen, onClose, user }) => {
               className="group flex items-center w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors duration-200"
             >
               <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-red-500" />
-              Sign Out
+              {t('sign_out')}
             </button>
           </div>
         </div>

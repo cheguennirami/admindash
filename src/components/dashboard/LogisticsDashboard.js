@@ -1,33 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
   Truck,
-  MessageSquare,
-  MapPin,
+  RefreshCw,
+  CreditCard,
   Clock,
   CheckCircle,
   AlertCircle,
-  Send,
-  Eye,
-  RefreshCw,
-  CreditCard
+  Eye
 } from 'lucide-react';
 import { orderOps, providerPaymentOps } from '../../services/jsonbin-new';
 import ProviderPaymentForm from '../payments/ProviderPaymentForm';
 import StatsCard from '../common/StatsCard';
 import LoadingSpinner from '../common/LoadingSpinner';
+import LogistiqueFranceForm from '../logistics/LogistiqueFranceForm';
 import { PieChart, Pie, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { startOfMonth, format } from 'date-fns';
 
 const LogisticsDashboard = () => {
   const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [communicationForm, setCommunicationForm] = useState({
-    message: '',
-    location: '',
-    notes: ''
-  });
-  const [statusUpdates, setStatusUpdates] = useState({});
   const [error, setError] = useState(null);
   const [providerPayments, setProviderPayments] = useState([]);
   const [loadingProvider, setLoadingProvider] = useState(false);
@@ -41,10 +34,35 @@ const LogisticsDashboard = () => {
     try {
       setLoading(true);
       setLoadingProvider(true);
+      setError(null);
 
       const orderList = await orderOps.getOrders().catch(() => []);
+      
+      // Calculate more granular order status counts
+      const boughtOrders = orderList.filter(order => order.status === 'bought').length;
+      const deliveredToFranceOrders = orderList.filter(order => order.status === 'delivered_to_france').length;
+      const deliveredToTunisiaOrders = orderList.filter(order => order.status === 'delivered_to_tunisia').length;
+      const deliveredToClientOrders = orderList.filter(order => order.status === 'delivered_to_client').length;
+      const inProgressOrders = orderList.filter(order => order.status === 'in_progress').length;
+
+      // Calculate pending logistics tasks
+      const pendingToBuy = orderList.filter(order => order.status === 'in_progress').length;
+      const pendingToShipToFrance = orderList.filter(order => order.status === 'bought').length;
+      const pendingToShipToTunisia = orderList.filter(order => order.status === 'delivered_to_france').length;
+      const pendingToDeliverToClient = orderList.filter(order => order.status === 'delivered_to_tunisia').length;
+
       setOrders(orderList);
-      console.log('✅ Loaded orders for logistics:', orderList.length);
+      setStats({
+        boughtOrders,
+        deliveredToFranceOrders,
+        deliveredToTunisiaOrders,
+        deliveredToClientOrders,
+        inProgressOrders,
+        pendingToBuy,
+        pendingToShipToFrance,
+        pendingToShipToTunisia,
+        pendingToDeliverToClient,
+      });
 
       const providerPaymentsList = await providerPaymentOps.getProviderPayments().catch(() => []);
       setProviderPayments(providerPaymentsList);
@@ -68,50 +86,6 @@ const LogisticsDashboard = () => {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const sendCommunication = async (e) => {
-    e.preventDefault();
-    if (!selectedOrder || !communicationForm.message) return;
-
-    try {
-      setError(null);
-      await orderOps.addCommunication(selectedOrder._id, {
-        message: communicationForm.message,
-        location: communicationForm.location,
-        notes: communicationForm.notes
-      });
-
-      // Reset form
-      setCommunicationForm({ message: '', location: '', notes: '' });
-
-      // Reload data
-      await loadData();
-
-      console.log('✅ Communication sent to France for order:', selectedOrder._id);
-    } catch (err) {
-      console.error('❌ Failed to send communication:', err);
-      setError('Failed to send communication');
-    }
-  };
-
-  const updateOrderStatus = async (orderId, newStatus) => {
-    try {
-      setError(null);
-      await orderOps.updateOrderStatusFromFrance(orderId, newStatus, statusUpdates[orderId]?.location, statusUpdates[orderId]?.notes);
-
-      // Clear the status update form
-      setStatusUpdates({ ...statusUpdates, [orderId]: {} });
-
-      // Reload data
-      await loadData();
-
-      console.log('✅ Order status updated:', orderId, newStatus);
-    } catch (err) {
-      console.error('❌ Failed to update order status:', err);
-      setError('Failed to update order status');
-    }
-  };
-
-  // Provider Payment Handlers
   const handlePaymentAdded = async (paymentData) => {
     const mappedData = { ...paymentData, id: paymentData._id };
     delete mappedData._id;
@@ -165,7 +139,6 @@ const LogisticsDashboard = () => {
     return acc;
   }, {});
 
-  // Prepare data for charts
   const orderStatusData = Object.entries(statusBreakdown).map(([status, count]) => ({
     name: status.replace('_', ' '),
     value: count
@@ -219,39 +192,96 @@ const LogisticsDashboard = () => {
         </div>
       )}
 
-      {/* Stats Grid */}
+      {/* Overall Order Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Total Orders"
           value={orders.length}
-          subtitle="From France"
+          subtitle="All orders"
           icon={Truck}
           color="blue"
         />
-
         <StatsCard
-          title="In Progress"
-          value={statusBreakdown.in_progress || 0}
-          subtitle="Being processed"
+          title="Orders In Progress"
+          value={stats?.inProgressOrders || 0}
+          subtitle="Currently being processed"
           icon={Clock}
           color="yellow"
         />
-
         <StatsCard
-          title="Delivered"
-          value={statusBreakdown.delivered_to_client || 0}
-          subtitle="Completed shipments"
+          title="Orders Bought"
+          value={stats?.boughtOrders || 0}
+          subtitle="Purchased from supplier"
+          icon={CheckCircle}
+          color="blue"
+        />
+        <StatsCard
+          title="Delivered to Client"
+          value={stats?.deliveredToClientOrders || 0}
+          subtitle="Final delivery completed"
           icon={CheckCircle}
           color="green"
         />
+      </div>
 
+      {/* Detailed Delivery Status Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatsCard
-          title="Communications"
-          value={orders.reduce((sum, order) => sum + (order.communications?.length || 0), 0)}
-          subtitle="Total messages"
-          icon={MessageSquare}
+          title="Delivered to France"
+          value={stats?.deliveredToFranceOrders || 0}
+          subtitle="Arrived in France"
+          icon={Truck}
           color="purple"
         />
+        <StatsCard
+          title="Delivered to Tunisia"
+          value={stats?.deliveredToTunisiaOrders || 0}
+          subtitle="Arrived in Tunisia"
+          icon={Truck}
+          color="teal"
+        />
+        <StatsCard
+          title="Total Communications"
+          value={orders.reduce((sum, order) => sum + (order.communications?.length || 0), 0)}
+          subtitle="All order messages"
+          icon={Eye}
+          color="orange"
+        />
+      </div>
+
+      {/* Pending Logistics Tasks */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Logistics Tasks</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Pending to Buy"
+            value={stats?.pendingToBuy || 0}
+            subtitle="Orders awaiting purchase"
+            icon={Clock}
+            color="red"
+          />
+          <StatsCard
+            title="Pending Ship to France"
+            value={stats?.pendingToShipToFrance || 0}
+            subtitle="Bought, awaiting shipment to France"
+            icon={Truck}
+            color="yellow"
+          />
+          <StatsCard
+            title="Pending Ship to Tunisia"
+            value={stats?.pendingToShipToTunisia || 0}
+            subtitle="In France, awaiting shipment to Tunisia"
+            icon={Truck}
+            color="orange"
+          />
+          <StatsCard
+            title="Pending Deliver to Client"
+            value={stats?.pendingToDeliverToClient || 0}
+            subtitle="In Tunisia, awaiting client delivery"
+            icon={Truck}
+            color="purple"
+          />
+        </div>
       </div>
 
       {/* Charts Section */}
@@ -450,152 +480,14 @@ const LogisticsDashboard = () => {
           </div>
         </div>
 
-        {/* Communication Panel */}
+        {/* Logistique France Form */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          {selectedOrder ? (
-            <>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <MessageSquare className="h-5 w-5 text-blue-500 mr-2" />
-                Communicate with France
-              </h3>
-
-              {/* Selected Order Info */}
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-gray-900">{selectedOrder.clientName}</span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
-                    {selectedOrder.status.replace('_', ' ')}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-600">
-                  Order: {selectedOrder.orderId || selectedOrder._id}
-                </div>
-              </div>
-
-              {/* Communication Form */}
-              <form onSubmit={sendCommunication} className="mb-4">
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Message *
-                    </label>
-                    <textarea
-                      value={communicationForm.message}
-                      onChange={(e) => setCommunicationForm({ ...communicationForm, message: e.target.value })}
-                      placeholder="Enter your message to France logistics..."
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Location
-                      </label>
-                      <input
-                        type="text"
-                        value={communicationForm.location}
-                        onChange={(e) => setCommunicationForm({ ...communicationForm, location: e.target.value })}
-                        placeholder="e.g., Paris Warehouse"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Notes
-                      </label>
-                      <input
-                        type="text"
-                        value={communicationForm.notes}
-                        onChange={(e) => setCommunicationForm({ ...communicationForm, notes: e.target.value })}
-                        placeholder="Additional notes..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-2 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Send to France Logistics
-                  </button>
-                </div>
-              </form>
-
-              {/* Status Update */}
-              <div className="border-t pt-4">
-                <h4 className="font-medium text-gray-900 mb-3">Update Order Status</h4>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <button
-                    onClick={() => updateOrderStatus(selectedOrder._id, 'bought')}
-                    className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium hover:bg-blue-200"
-                  >
-                    Mark as Bought
-                  </button>
-                  <button
-                    onClick={() => updateOrderStatus(selectedOrder._id, 'in_progress')}
-                    className="px-3 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium hover:bg-yellow-200"
-                  >
-                    In Progress
-                  </button>
-                  <button
-                    onClick={() => updateOrderStatus(selectedOrder._id, 'delivered_to_client')}
-                    className="px-3 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-medium hover:bg-green-200"
-                  >
-                    Delivered
-                  </button>
-                  <button
-                    onClick={() => updateOrderStatus(selectedOrder._id, 'cancelled')}
-                    className="px-3 py-2 bg-red-100 text-red-800 rounded-lg text-sm font-medium hover:bg-red-200"
-                  >
-                    Cancelled
-                  </button>
-                </div>
-              </div>
-
-              {/* Communications History */}
-              <div className="border-t pt-4">
-                <h4 className="font-medium text-gray-900 mb-3 flex items-center">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Communication History ({selectedOrder.communications?.length || 0})
-                </h4>
-                <div className="max-h-48 overflow-y-auto space-y-2">
-                  {selectedOrder.communications?.length > 0 ? (
-                    selectedOrder.communications.map((comm, index) => (
-                      <div key={comm._id || index} className="p-2 bg-gray-50 rounded border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-blue-600">{comm.from || 'France'}</span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(comm.timestamp).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-800">{comm.message}</p>
-                        {comm.location && (
-                          <div className="flex items-center mt-1">
-                            <MapPin className="h-3 w-3 text-gray-400 mr-1" />
-                            <span className="text-xs text-gray-500">{comm.location}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-xs text-gray-500 text-center py-4">
-                      No communications yet
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="text-center text-gray-500 py-8">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>Select an order to communicate with France</p>
-            </div>
-          )}
+          <LogistiqueFranceForm
+            selectedOrder={selectedOrder}
+            onCommunicationSent={loadData}
+            onStatusUpdated={loadData}
+            error={error}
+          />
         </div>
       </div>
     </div>

@@ -40,22 +40,25 @@ const MarketingDashboard = () => {
 
       // Calculate stats
       const totalClients = clients.length;
-      const totalRevenue = payments
-        .filter(p => p.type === 'income')
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
-      const totalProfit = totalRevenue - payments
-        .filter(p => p.type === 'expense')
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
+      const totalClientRevenue = clients.reduce((sum, client) => sum + (client.sellingPrice || 0), 0);
+      const totalClientProfit = clients.reduce((sum, client) => sum + ((client.sellingPrice || 0) - (client.buyingPrice || 0)), 0);
+      const totalClientBuyingPrice = clients.reduce((sum, client) => sum + (client.buyingPrice || 0), 0);
       const confirmedOrders = clients.filter(c => c.confirmation === 'confirmed').length;
+
+      // Overall financial stats (from payments)
+      const totalIncome = payments.filter(p => p.type === 'income').reduce((sum, p) => sum + (p.amount || 0), 0);
+      const totalExpenses = payments.filter(p => p.type === 'expense').reduce((sum, p) => sum + (p.amount || 0), 0);
+      const overallProfit = totalIncome - totalExpenses;
 
       const statsData = {
         totalClients,
         totalOrders: confirmedOrders,
-        revenue: {
-          totalRevenue,
-          totalProfit,
-          totalCost: totalRevenue - totalProfit
-        },
+        totalClientRevenue,
+        totalClientProfit,
+        totalClientBuyingPrice,
+        overallIncome: totalIncome,
+        overallExpenses: totalExpenses,
+        overallProfit,
         orderStatusBreakdown: [
           { _id: 'in_progress', count: clients.filter(c => c.status === 'in_progress').length },
           { _id: 'confirmed', count: clients.filter(c => c.confirmation === 'confirmed').length },
@@ -106,7 +109,12 @@ const MarketingDashboard = () => {
       setStats({
         totalClients: 0,
         totalOrders: 0,
-        revenue: { totalRevenue: 0, totalProfit: 0, totalCost: 0 },
+        totalClientRevenue: 0,
+        totalClientProfit: 0,
+        totalClientBuyingPrice: 0,
+        overallIncome: 0,
+        overallExpenses: 0,
+        overallProfit: 0,
         orderStatusBreakdown: [],
         monthlyRevenue: []
       });
@@ -125,9 +133,10 @@ const MarketingDashboard = () => {
     );
   }
 
-  const totalRevenue = stats?.revenue?.totalRevenue || 0;
-  const totalProfit = stats?.revenue?.totalProfit || 0;
-  const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
+  const totalClientRevenue = stats?.totalClientRevenue || 0;
+  const totalClientProfit = stats?.totalClientProfit || 0;
+  const totalClientBuyingPrice = stats?.totalClientBuyingPrice || 0;
+  const profitMargin = totalClientRevenue > 0 ? ((totalClientProfit / totalClientRevenue) * 100).toFixed(1) : 0;
 
   return (
     <div className="space-y-6">
@@ -162,21 +171,39 @@ const MarketingDashboard = () => {
         />
         
         <StatsCard
-          title="Total Revenue"
-          value={`${totalRevenue.toLocaleString()} TND`}
-          subtitle="This month"
+          title="Total Client Revenue"
+          value={`${totalClientRevenue.toLocaleString()} TND`}
+          subtitle="From selling price / Total Selling Price"
           icon={DollarSign}
           color="green"
           trend={{ value: 18, isPositive: true }}
         />
         
         <StatsCard
-          title="Total Profit"
-          value={`${totalProfit.toLocaleString()} TND`}
+          title="Total Client Profit"
+          value={`${totalClientProfit.toLocaleString()} TND`}
           subtitle={`${profitMargin}% margin`}
           icon={TrendingUp}
-          color="purple"
-          trend={{ value: 25, isPositive: true }}
+          color={totalClientProfit >= 0 ? 'purple' : 'red'}
+          trend={{ value: 25, isPositive: totalClientProfit >= 0 }}
+        />
+
+        {totalClientProfit < 0 && (
+          <StatsCard
+            title="Client Loss"
+            value={`${Math.abs(totalClientProfit).toLocaleString()} TND`}
+            subtitle="From client orders"
+            icon={X}
+            color="red"
+          />
+        )}
+
+        <StatsCard
+          title="Total Buying Price"
+          value={`${totalClientBuyingPrice.toLocaleString()} TND`}
+          subtitle="From client orders"
+          icon={DollarSign}
+          color="orange"
         />
         
         <StatsCard

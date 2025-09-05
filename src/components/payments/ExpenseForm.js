@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Plus, DollarSign, Receipt, Users } from 'lucide-react';
-import { paymentOps, clientOps, authOps } from '../../services/jsonbin-new';
+import { paymentOps, clientOps, authOps, categoryOps } from '../../services/jsonbin-new';
 import LoadingSpinner from '../common/LoadingSpinner';
+import { useTranslation } from 'react-i18next';
 
 const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
-    clientId: '',
-    userId: '',
+    relatedEntityId: '',
+    relatedEntityType: '', // 'client' or 'user'
     category: '',
     notes: '',
     type: transactionType === 'both' ? 'expense' : transactionType
@@ -18,16 +20,21 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
   const [success, setSuccess] = useState(null);
   const [clients, setClients] = useState([]);
   const [users, setUsers] = useState([]);
+  const [expenseCategories, setExpenseCategories] = useState([]);
+  const [incomeCategories, setIncomeCategories] = useState([]);
 
   React.useEffect(() => {
     const loadData = async () => {
       try {
-        const [clientList, userList] = await Promise.all([
+        const [clientList, userList, categoriesData] = await Promise.all([
           clientOps.getClients().catch(() => []),
-          authOps.getUsers().catch(() => [])
+          authOps.getUsers().catch(() => []),
+          categoryOps.getCategories().catch(() => ({ expense: [], income: [] }))
         ]);
         setClients(clientList);
         setUsers(userList);
+        setExpenseCategories(categoriesData.expense);
+        setIncomeCategories(categoriesData.income);
       } catch (err) {
         console.error('❌ Failed to load data:', err);
       }
@@ -39,8 +46,8 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.description || !formData.amount || (formData.type === 'expense' && !formData.userId) || (formData.type === 'income' && !formData.clientId)) {
-      setError('Please fill in all required fields');
+    if (!formData.description || !formData.amount || (formData.type === 'expense' && (!formData.relatedEntityId || formData.relatedEntityType !== 'user')) || (formData.type === 'income' && (!formData.relatedEntityId || formData.relatedEntityType !== 'client'))) {
+      setError(t('fill_all_required_fields'));
       return;
     }
 
@@ -55,23 +62,30 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         notes: formData.notes
       };
 
-      // Handle associations based on transaction type
-      if (formData.type === 'expense' && formData.userId) {
-        transactionData.userId = formData.userId;
-        const user = users.find(u => u._id === formData.userId);
+      // Add new category if it doesn't exist
+      if (formData.category && formData.type === 'expense' && !expenseCategories.includes(formData.category)) {
+        await categoryOps.addCategory('expense', formData.category);
+        setExpenseCategories(prev => [...prev, formData.category]);
+      } else if (formData.category && formData.type === 'income' && !incomeCategories.includes(formData.category)) {
+        await categoryOps.addCategory('income', formData.category);
+        setIncomeCategories(prev => [...prev, formData.category]);
+      }
+
+      // Handle associations based on transaction type and related entity
+      if (formData.type === 'expense' && formData.relatedEntityType === 'user' && formData.relatedEntityId) {
+        transactionData.userId = formData.relatedEntityId;
+        const user = users.find(u => u._id === formData.relatedEntityId);
         if (user) {
           transactionData.userName = user.fullName;
           transactionData.userEmail = user.email;
           transactionData.userRole = user.role;
         }
-      }
-
-      if (formData.type === 'income' && formData.clientId) {
-        transactionData.clientId = formData.clientId;
-        const client = clients.find(c => c._id === formData.clientId);
+      } else if (formData.type === 'income' && formData.relatedEntityType === 'client' && formData.relatedEntityId) {
+        transactionData.clientId = formData.relatedEntityId;
+        const client = clients.find(c => c._id === formData.relatedEntityId);
         if (client) {
           transactionData.clientName = client.fullName;
-          transactionData.clientEmail = client.phoneNumber; // Note: Using phone number as identifier since email field seems missing
+          transactionData.clientEmail = client.phoneNumber;
         }
       }
 
@@ -88,14 +102,14 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
       setFormData({
         description: '',
         amount: '',
-        clientId: '',
-        userId: '',
+        relatedEntityId: '',
+        relatedEntityType: '',
         category: '',
         notes: '',
         type: transactionType === 'both' ? 'expense' : transactionType
       });
 
-      setSuccess(`${formData.type === 'expense' ? 'Expense' : 'Income'} added successfully!`);
+      setSuccess(t(formData.type === 'expense' ? 'expense_added_successfully' : 'income_added_successfully'));
 
       // Notify parent component
       if (onExpenseAdded) {
@@ -104,31 +118,13 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
 
     } catch (err) {
       console.error('❌ Failed to add transaction:', err);
-      setError('Failed to add transaction. Please try again.');
+      setError(t('failed_to_add_transaction'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const categoryOptions = formData.type === 'expense'
-    ? [
-        'Office Supplies',
-        'Software & Tools',
-        'Marketing & Advertising',
-        'Utilities',
-        'Travel & Transport',
-        'Professional Services',
-        'Equipment',
-        'Miscellaneous'
-      ]
-    : [
-        'Service Fees',
-        'Consultation',
-        'Maintenance',
-        'Licenses',
-        'Commissions',
-        'Miscellaneous'
-      ];
+  const categoryOptions = formData.type === 'expense' ? expenseCategories : incomeCategories;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -136,12 +132,12 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         {formData.type === 'expense' ? (
           <>
             <Receipt className="h-5 w-5 text-red-500 mr-2" />
-            Add Expense
+            {t('add_expense')}
           </>
         ) : (
           <>
             <DollarSign className="h-5 w-5 text-green-500 mr-2" />
-            Add Income
+            {t('add_income')}
           </>
         )}
       </h3>
@@ -163,7 +159,7 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         {transactionType === 'both' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Transaction Type *
+              {t('transaction_type')} *
             </label>
             <div className="flex space-x-4">
               <label className="flex items-center">
@@ -175,7 +171,7 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   className="mr-2"
                 />
-                <span className="text-sm text-gray-700">Expense</span>
+                <span className="text-sm text-gray-700">{t('expense')}</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -186,7 +182,7 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   className="mr-2"
                 />
-                <span className="text-sm text-gray-700">Income</span>
+                <span className="text-sm text-gray-700">{t('income')}</span>
               </label>
             </div>
           </div>
@@ -195,13 +191,13 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         {/* Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Description *
+            {t('description')} *
           </label>
           <input
             type="text"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Enter transaction description"
+            placeholder={t('enter_transaction_description')}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
           />
@@ -210,7 +206,7 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         {/* Amount */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Amount (TND) *
+            {t('amount')} (TND) *
           </label>
           <input
             type="number"
@@ -227,19 +223,19 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         {/* Category */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Category
+            {t('category')}
           </label>
           <input
             type="text"
             list="categories"
             value={formData.category}
             onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-            placeholder="Enter or select category"
+            placeholder={t('enter_or_select_category')}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <datalist id="categories">
             {categoryOptions.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+              <option key={cat} value={cat}>{t(cat.replace(' ', '_').toLowerCase())}</option>
             ))}
           </datalist>
         </div>
@@ -248,20 +244,23 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         {formData.type === 'expense' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Related Expense User *
+              {t('related_expense_user')} *
             </label>
             <div className="relative">
               <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <select
-                value={formData.userId}
-                onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
+                value={formData.relatedEntityId ? `user-${formData.relatedEntityId}` : ''}
+                onChange={(e) => {
+                  const [type, id] = e.target.value.split('-');
+                  setFormData({ ...formData, relatedEntityId: id, relatedEntityType: type });
+                }}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               >
-                <option value="">Select user</option>
+                <option value="">{t('select_user')}</option>
                 {users.filter(user => user.isActive).map(user => (
-                  <option key={user._id} value={user._id}>
-                    {user.fullName} - {user.email} ({user.role})
+                  <option key={`user-${user._id}`} value={`user-${user._id}`}>
+                    {user.fullName} - {user.email} ({t(user.role)})
                   </option>
                 ))}
               </select>
@@ -269,25 +268,37 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
           </div>
         )}
 
-        {/* Client Selection (only for income) */}
+        {/* Client/User Selection (for income) */}
         {formData.type === 'income' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Related Client
+              {t('related_client_user')}
             </label>
             <div className="relative">
               <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <select
-                value={formData.clientId}
-                onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+                value={formData.relatedEntityId ? `${formData.relatedEntityType}-${formData.relatedEntityId}` : ''}
+                onChange={(e) => {
+                  const [type, id] = e.target.value.split('-');
+                  setFormData({ ...formData, relatedEntityId: id, relatedEntityType: type });
+                }}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">Select client (optional)</option>
-                {clients.map(client => (
-                  <option key={client._id} value={client._id}>
-                    {client.fullName} - {client.phoneNumber}
-                  </option>
-                ))}
+                <option value="">{t('select_client_or_user_optional')}</option>
+                <optgroup label={t('clients')}>
+                  {clients.map(client => (
+                    <option key={`client-${client._id}`} value={`client-${client._id}`}>
+                      {client.fullName} ({t('client')}) - {client.phoneNumber}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label={t('users')}>
+                  {users.filter(user => user.isActive).map(user => (
+                    <option key={`user-${user._id}`} value={`user-${user._id}`}>
+                      {user.fullName} ({t('user')}) - {user.email}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
           </div>
@@ -296,12 +307,12 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         {/* Notes */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Notes
+            {t('notes')}
           </label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Additional notes (optional)"
+            placeholder={t('additional_notes_optional')}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
           />
@@ -316,12 +327,12 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
           {isLoading ? (
             <>
               <LoadingSpinner size="sm" color="white" />
-              <span className="ml-2">Adding Transaction...</span>
+              <span className="ml-2">{t('adding_transaction')}...</span>
             </>
           ) : (
             <>
               <Plus className="h-5 w-5 mr-2" />
-              Add {formData.type === 'expense' ? 'Expense' : 'Income'}
+              {t(formData.type === 'expense' ? 'add_expense' : 'add_income')}
             </>
           )}
         </button>

@@ -13,6 +13,8 @@ import UserManagement from '../users/UserManagement';
 import ClientManagement from '../clients/ClientManagement';
 import OrderManagement from '../orders/OrderManagement';
 import PaymentManagement from '../payments/PaymentManagement';
+import PaymentOverview from '../payments/PaymentOverview';
+import FinancialReports from '../payments/FinancialReports';
 import Settings from '../settings/Settings';
 
 const Dashboard = () => {
@@ -20,16 +22,13 @@ const Dashboard = () => {
 
   const getDashboardComponent = () => {
     switch (user?.role) {
-      case 'super_admin':
-        return <SuperAdminDashboard />;
-      case 'marketing':
-        return <MarketingDashboard />;
       case 'logistics':
         return <LogisticsDashboard />;
+      case 'super_admin':
+      case 'marketing':
       case 'treasurer':
-        return <TreasurerDashboard />;
       default:
-        return <div>Access Denied</div>;
+        return <SuperAdminDashboard />; // Use SuperAdminDashboard as the generic dashboard
     }
   };
 
@@ -60,7 +59,13 @@ const Dashboard = () => {
 
       {/* Payment Management - Treasurer, Super Admin */}
       {['super_admin', 'treasurer'].includes(user?.role) && (
-        <Route path="payments/*" element={<PaymentManagement />} />
+        <Route path="payments/*">
+          <Route index element={<PaymentOverview />} /> {/* Default for /dashboard/payments */}
+          <Route path="overview" element={<PaymentOverview />} />
+          <Route path="new" element={<PaymentManagement />} /> {/* Assuming PaymentManagement handles adding new payments */}
+          <Route path="reports" element={<FinancialReports />} />
+          <Route path="*" element={<PaymentManagement />} /> {/* Fallback for other payment routes */}
+        </Route>
       )}
       
       {/* Settings - All Users */}
