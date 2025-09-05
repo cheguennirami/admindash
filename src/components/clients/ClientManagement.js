@@ -13,6 +13,7 @@ import { clientOps } from '../../services/jsonbin-new'; // Import JSONBin client
 import LoadingSpinner from '../common/LoadingSpinner';
 import ClientForm from './ClientForm';
 import ClientDetails from './ClientDetails';
+import ClientReceipt from './ClientReceipt';
 import toast from 'react-hot-toast';
 
 const ClientList = () => {
@@ -62,8 +63,13 @@ const ClientList = () => {
       const endIndex = startIndex + 10;
       const paginatedClients = allClients.slice(startIndex, endIndex);
 
+      const currentTotalBuyingPrice = allClients.reduce((sum, client) => sum + parseFloat(client.buyingPrice || 0), 0);
+      const currentTotalSellingPrice = allClients.reduce((sum, client) => sum + parseFloat(client.sellingPrice || 0), 0);
+
       setClients(paginatedClients);
       setTotalPages(Math.ceil(allClients.length / 10));
+      setTotalBuyingPrice(currentTotalBuyingPrice);
+      setTotalSellingPrice(currentTotalSellingPrice);
 
       console.log(`📄 Showing page ${currentPage} with ${paginatedClients.length} clients`);
     } catch (error) {
@@ -73,6 +79,9 @@ const ClientList = () => {
       setLoading(false);
     }
   }, [currentPage, searchTerm, statusFilter, confirmationFilter]);
+
+  const [totalBuyingPrice, setTotalBuyingPrice] = useState(0);
+  const [totalSellingPrice, setTotalSellingPrice] = useState(0);
 
   useEffect(() => {
     fetchClients();
@@ -330,6 +339,15 @@ const ClientList = () => {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="bg-gray-100 font-bold">
+                    <td className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider" colSpan="3">Totals (Current View)</td><td className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      <div>Buy: {totalBuyingPrice.toFixed(2)} TND</div>
+                      <div>Sell: {totalSellingPrice.toFixed(2)} TND</div>
+                      <div className="text-green-600">Profit: {(totalSellingPrice - totalBuyingPrice).toFixed(2)} TND</div>
+                    </td><td colSpan="6"></td> {/* Span remaining columns */}
+                  </tr>
+                </tfoot>
               </table>
             </div>
 
@@ -393,6 +411,7 @@ const ClientManagement = () => {
       <Route path="/new" element={<ClientForm />} />
       <Route path="/:id" element={<ClientDetails />} />
       <Route path="/:id/edit" element={<ClientForm />} />
+      <Route path="/:id/receipt" element={<ClientReceipt />} />
     </Routes>
   );
 };

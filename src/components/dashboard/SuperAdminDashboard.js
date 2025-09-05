@@ -4,6 +4,7 @@ import {
   ShoppingCart,
   DollarSign,
   TrendingUp,
+  TrendingDown,
   Activity,
   AlertCircle,
   CheckCircle,
@@ -38,6 +39,21 @@ const SuperAdminDashboard = () => {
         orderOps.getOrders().catch(() => [])
       ]);
 
+      // Calculate overall financial stats from payments
+      const totalIncome = payments.reduce((sum, p) => sum + (p.type === 'income' ? p.amount : 0), 0);
+      const totalExpenses = payments.reduce((sum, p) => sum + (p.type === 'expense' ? p.amount : 0), 0);
+      const overallProfit = totalIncome - totalExpenses;
+
+      // Calculate client-specific financial stats
+      const totalClientRevenue = clients.reduce((sum, client) => sum + parseFloat(client.sellingPrice || 0), 0);
+      const totalClientProfit = clients.reduce((sum, client) => sum + (parseFloat(client.sellingPrice || 0) - parseFloat(client.buyingPrice || 0)), 0);
+      const totalClientBuyingPrice = clients.reduce((sum, client) => sum + parseFloat(client.buyingPrice || 0), 0);
+
+      // Calculate order confirmation stats
+      const confirmedOrders = clients.filter(client => client.confirmation === 'confirmed').length;
+      const pendingOrders = clients.filter(client => client.confirmation === 'pending').length;
+      const cancelledOrders = clients.filter(client => client.confirmation === 'cancelled').length;
+
 
       // Calculate stats
       const userStats = {};
@@ -53,14 +69,7 @@ const SuperAdminDashboard = () => {
         orderStats[o.status].count++;
       });
 
-      const revenue = {
-        totalRevenue: payments.reduce((sum, p) => sum + (p.type === 'income' ? p.amount : 0), 0),
-        totalProfit: payments.reduce((sum, p) => {
-          if (p.type === 'income') return sum + p.amount;
-          if (p.type === 'expense') return sum - p.amount;
-          return sum;
-        }, 0)
-      };
+      // No need for a separate 'revenue' object if we have totalIncome, totalExpenses, overallProfit
 
       // Process monthly revenue for chart
       const monthlyRevenue = {};
@@ -78,7 +87,15 @@ const SuperAdminDashboard = () => {
       setStats({
         users: Object.entries(userStats).map(([role, data]) => ({ _id: role, ...data })),
         totalClients: clients.length,
-        revenue,
+        totalIncome,
+        totalExpenses,
+        overallProfit,
+        totalClientRevenue,
+        totalClientProfit,
+        totalClientBuyingPrice,
+        confirmedOrders,
+        pendingOrders,
+        cancelledOrders,
         orderStatusBreakdown: Object.entries(orderStats).map(([status, data]) => ({ _id: status, count: data.count })),
         monthlyRevenueData,
         recentActivity: [
@@ -104,8 +121,15 @@ const SuperAdminDashboard = () => {
 
   const totalUsers = stats?.users?.reduce((sum, user) => sum + user.count, 0) || 0;
   const activeUsers = stats?.users?.reduce((sum, user) => sum + user.active, 0) || 0;
-  const totalRevenue = stats?.revenue?.totalRevenue || 0;
-  const totalProfit = stats?.revenue?.totalProfit || 0;
+  const totalIncome = stats?.totalIncome || 0;
+  const totalExpenses = stats?.totalExpenses || 0;
+  const overallProfit = stats?.overallProfit || 0;
+  const totalClientRevenue = stats?.totalClientRevenue || 0;
+  const totalClientProfit = stats?.totalClientProfit || 0;
+  const totalClientBuyingPrice = stats?.totalClientBuyingPrice || 0;
+  const confirmedOrders = stats?.confirmedOrders || 0;
+  const pendingOrders = stats?.pendingOrders || 0;
+  const cancelledOrders = stats?.cancelledOrders || 0;
 
   // Prepare chart data
   const userRoleData = stats?.users?.map(user => ({
@@ -162,21 +186,89 @@ const SuperAdminDashboard = () => {
         />
         
         <StatsCard
-          title="Total Revenue"
-          value={`${totalRevenue.toLocaleString()} TND`}
-          subtitle="This month"
-          icon={DollarSign}
-          color="yellow"
+          title="Total Income"
+          value={`${totalIncome.toFixed(2).toLocaleString()} TND`}
+          subtitle="Overall"
+          icon={TrendingUp}
+          color="green"
           trend={{ value: 15, isPositive: true }}
         />
         
         <StatsCard
-          title="Total Profit"
-          value={`${totalProfit.toLocaleString()} TND`}
-          subtitle="This month"
+          title="Total Expenses"
+          value={`${totalExpenses.toFixed(2).toLocaleString()} TND`}
+          subtitle="Overall"
+          icon={TrendingDown}
+          color="red"
+          trend={{ value: 10, isPositive: false }}
+        />
+
+        <StatsCard
+          title="Overall Profit"
+          value={`${overallProfit.toFixed(2).toLocaleString()} TND`}
+          subtitle="Overall"
+          icon={DollarSign}
+          color={overallProfit >= 0 ? 'purple' : 'red'}
+          trend={{ value: 23, isPositive: overallProfit >= 0 }}
+        />
+      </div>
+
+      {/* Client Financial Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatsCard
+          title="Total Client Revenue"
+          value={`${totalClientRevenue.toFixed(2).toLocaleString()} TND`}
+          subtitle="From selling price"
+          icon={DollarSign}
+          color="blue"
+        />
+        <StatsCard
+          title="Total Client Profit"
+          value={`${totalClientProfit.toFixed(2).toLocaleString()} TND`}
+          subtitle="From client orders"
           icon={TrendingUp}
-          color="purple"
-          trend={{ value: 23, isPositive: true }}
+          color={totalClientProfit >= 0 ? 'green' : 'red'}
+        />
+        {totalClientProfit < 0 && (
+          <StatsCard
+            title="Client Loss"
+            value={`${Math.abs(totalClientProfit).toFixed(2).toLocaleString()} TND`}
+            subtitle="From client orders"
+            icon={AlertCircle}
+            color="red"
+          />
+        )}
+        <StatsCard
+          title="Total Client Buying Price"
+          value={`${totalClientBuyingPrice.toFixed(2).toLocaleString()} TND`}
+          subtitle="From client orders"
+          icon={ShoppingCart}
+          color="orange"
+        />
+      </div>
+
+      {/* Order Confirmation Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatsCard
+          title="Confirmed Orders"
+          value={confirmedOrders}
+          subtitle="Total confirmed"
+          icon={CheckCircle}
+          color="green"
+        />
+        <StatsCard
+          title="Pending Orders"
+          value={pendingOrders}
+          subtitle="Total pending"
+          icon={Clock}
+          color="yellow"
+        />
+        <StatsCard
+          title="Cancelled Orders"
+          value={cancelledOrders}
+          subtitle="Total cancelled"
+          icon={AlertCircle}
+          color="red"
         />
       </div>
 
