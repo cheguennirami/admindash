@@ -107,7 +107,7 @@ const ClientReceipt = () => {
         <div>
           <p className="text-sm font-medium text-gray-500">{t('advance_payment')}</p>
           <p className="text-base text-gray-900">
-            {client.advanceAmount || (client.sellingPrice * 0.3).toFixed(2)} TND
+            {client.advanceAmount !== undefined && client.advanceAmount !== null ? client.advanceAmount.toFixed(2) : '0.00'} TND
             <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
               client.advancePaid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
             }`}>
@@ -118,7 +118,7 @@ const ClientReceipt = () => {
         <div>
           <p className="text-sm font-medium text-gray-500">{t('remaining_payment')}</p>
           <p className="text-base text-gray-900">
-            {client.remainingAmount || (client.sellingPrice * 0.7).toFixed(2)} TND
+            {client.remainingAmount !== undefined && client.remainingAmount !== null ? client.remainingAmount.toFixed(2) : '0.00'} TND
             <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
               client.remainingPaid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
             }`}>
@@ -159,11 +159,11 @@ const ClientReceipt = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-4">{t('screenshots')}</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {client.screenshots.map((screenshot, index) => (
-              <div key={index} className="relative w-full h-32 bg-gray-100 rounded-lg overflow-hidden">
+              <div key={index} className="relative w-full bg-gray-100 rounded-lg overflow-hidden print:h-auto print:w-full">
                 <img
                   src={screenshot.url}
                   alt={`Screenshot ${index + 1}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain print:object-contain"
                 />
               </div>
             ))}

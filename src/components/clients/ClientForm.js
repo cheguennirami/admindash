@@ -123,7 +123,10 @@ const ClientForm = () => {
           if (key === 'articles') {
             // Ensure articles are correctly set for useFieldArray
             client.articles.forEach(article => append(article));
-          } else if (key !== 'screenshots') {
+          } else if (key === 'advanceAmount' || key === 'remainingAmount') {
+            setValue(key, parseFloat(client[key]));
+          }
+          else if (key !== 'screenshots') {
             setValue(key, client[key]);
           }
         });
@@ -187,8 +190,10 @@ const ClientForm = () => {
       let clientData = {
         ...data,
         // Add additional fields that might be missing
-        advanceAmount: data.totalSellingPrice * 0.3,
-        remainingAmount: data.totalSellingPrice * 0.7,
+        advanceAmount: data.advanceAmount !== undefined && data.advanceAmount !== null
+          ? parseFloat(data.advanceAmount)
+          : parseFloat((data.totalSellingPrice * 0.3).toFixed(2)),
+        remainingAmount: parseFloat((data.totalSellingPrice - (data.advanceAmount || 0)).toFixed(2)),
         advancePaid: data.advancePaid || false,
         remainingPaid: data.remainingPaid || false,
         confirmation: data.confirmation || 'pending',
@@ -505,45 +510,58 @@ const ClientForm = () => {
               </select>
             </div>
 
-            {/* Advance Payment Status */}
+            {/* Advance Payment */}
             <div>
-              <label className="form-label">{t('advance_payment')} (30%)</label>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="advancePaid"
-                    className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
-                    {...register('advancePaid')}
-                  />
-                  <label htmlFor="advancePaid" className="ml-2 block text-sm text-gray-900">
-                    {t('advance_paid')}
-                  </label>
-                </div>
-                <div className="text-sm text-gray-500">
-                  {t('amount')}: {watch('sellingPrice') ? (watch('sellingPrice') * 0.3).toFixed(2) : '0.00'} TND
-                </div>
+              <label className="form-label">{t('advance_payment')} (TND)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className={`form-input ${errors.advanceAmount ? 'border-red-500' : ''}`}
+                placeholder="0.00"
+                {...register('advanceAmount', {
+                  valueAsNumber: true,
+                  min: { value: 0, message: t('amount_cannot_be_negative') }
+                })}
+              />
+              {errors.advanceAmount && (
+                <p className="text-red-500 text-sm mt-1">{errors.advanceAmount.message}</p>
+              )}
+              <div className="flex items-center mt-2">
+                <input
+                  type="checkbox"
+                  id="advancePaid"
+                  className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                  {...register('advancePaid')}
+                />
+                <label htmlFor="advancePaid" className="ml-2 block text-sm text-gray-900">
+                  {t('advance_paid')}
+                </label>
               </div>
             </div>
 
-            {/* Remaining Payment Status */}
+            {/* Remaining Payment */}
             <div>
-              <label className="form-label">{t('remaining_payment')} (70%)</label>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="remainingPaid"
-                    className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
-                    {...register('remainingPaid')}
-                  />
-                  <label htmlFor="remainingPaid" className="ml-2 block text-sm text-gray-900">
-                    {t('remaining_paid')}
-                  </label>
-                </div>
-                <div className="text-sm text-gray-500">
-                  {t('amount')}: {watch('sellingPrice') ? (watch('sellingPrice') * 0.7).toFixed(2) : '0.00'} TND
-                </div>
+              <label className="form-label">{t('remaining_payment')} (TND)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className={`form-input bg-gray-100 cursor-not-allowed`}
+                value={(watch('totalSellingPrice') - (watch('advanceAmount') || 0)).toFixed(2)}
+                readOnly
+                {...register('remainingAmount')}
+              />
+              <div className="flex items-center mt-2">
+                <input
+                  type="checkbox"
+                  id="remainingPaid"
+                  className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                  {...register('remainingPaid')}
+                />
+                <label htmlFor="remainingPaid" className="ml-2 block text-sm text-gray-900">
+                  {t('remaining_paid')}
+                </label>
               </div>
             </div>
 
