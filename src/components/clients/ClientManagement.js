@@ -252,18 +252,14 @@ const ClientList = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {clients.map((client) => (
                     <tr key={client._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {client.orderId}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{client.orderId}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">{client.fullName}</div>
                           <div className="text-sm text-gray-500 truncate max-w-xs">{client.address}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {client.phoneNumber}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.phoneNumber}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div>
                           <div>Buy: {client.buyingPrice} TND</div>
@@ -341,11 +337,13 @@ const ClientList = () => {
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-100 font-bold">
-                    <td className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider" colSpan="3">Totals (Current View)</td><td className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    <td className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider" colSpan="3">Totals (Current View)</td>
+                    <td className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       <div>Buy: {totalBuyingPrice.toFixed(2)} TND</div>
                       <div>Sell: {totalSellingPrice.toFixed(2)} TND</div>
                       <div className="text-green-600">Profit: {(totalSellingPrice - totalBuyingPrice).toFixed(2)} TND</div>
-                    </td><td colSpan="6"></td> {/* Span remaining columns */}
+                    </td>
+                    <td colSpan="6"></td> {/* Span remaining columns */}
                   </tr>
                 </tfoot>
               </table>

@@ -71,7 +71,7 @@ const OrderManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, statusFilter, t]);
+  }, [currentPage, statusFilter, t, user?.role]);
 
   useEffect(() => {
     fetchOrders();
