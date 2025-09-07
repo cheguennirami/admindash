@@ -1,4 +1,5 @@
 import { initializeAppData } from './jsonbin-new';
+import { getFinalConfig } from '../config/jsonbin'; // Import getFinalConfig
 import toast from 'react-hot-toast';
 
 // This function initializes the app by connecting to JSONBin
@@ -14,7 +15,9 @@ export const initializeApp = async () => {
     console.log('🔧 Configuration Check:');
     console.log(`✅ API Key: ${apiKey ? '[config present]' : 'MISSING'}`);
     console.log(`✅ Bin ID: ${binId}`);
-    console.log(`🔗 JSONBin URL: https://api.jsonbin.io/v3/b/${binId}`);
+    // Use the baseUrl from getFinalConfig for accurate logging
+    const { baseUrl: finalBaseUrl } = getFinalConfig();
+    console.log(`🔗 JSONBin URL: ${finalBaseUrl}/${binId}`);
 
     if (!apiKey || !binId) {
       console.warn('⚠️ Using fallback configuration');
