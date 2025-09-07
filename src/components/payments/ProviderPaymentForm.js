@@ -24,6 +24,12 @@ const ProviderPaymentForm = ({ onPaymentAdded, onPaymentUpdated, initialPayment 
   const onSubmit = (data) => {
     const totalAmount = parseFloat(data.totalAmount);
     const amountPaid = parseFloat(data.amountPaid);
+
+    if (isNaN(totalAmount) || isNaN(amountPaid)) {
+      toast.error('Please enter valid numbers for Total Amount and Amount Paid.');
+      return;
+    }
+
     const remainingAmount = totalAmount - amountPaid;
 
     let status;
@@ -89,14 +95,12 @@ const ProviderPaymentForm = ({ onPaymentAdded, onPaymentUpdated, initialPayment 
           </label>
           <input
             id="totalAmount"
-            type="number"
-            step="0.01"
-            min="0"
-            {...register('totalAmount', { required: true, min: 0 })}
+            type="text"
+            {...register('totalAmount', { required: true, pattern: /^\d+(\.\d{1,2})?$/ })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="0.00"
           />
-          {errors.totalAmount && <p className="text-red-500 text-sm mt-1">Valid total amount is required</p>}
+          {errors.totalAmount && <p className="text-red-500 text-sm mt-1">Total amount is required and must be a valid number (e.g., 100.00)</p>}
         </div>
 
         {/* Amount Paid */}
@@ -106,14 +110,12 @@ const ProviderPaymentForm = ({ onPaymentAdded, onPaymentUpdated, initialPayment 
           </label>
           <input
             id="amountPaid"
-            type="number"
-            step="0.01"
-            min="0"
-            {...register('amountPaid', { required: true, min: 0 })}
+            type="text"
+            {...register('amountPaid', { required: true, pattern: /^\d+(\.\d{1,2})?$/ })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="0.00"
           />
-          {errors.amountPaid && <p className="text-red-500 text-sm mt-1">Valid amount paid is required</p>}
+          {errors.amountPaid && <p className="text-red-500 text-sm mt-1">Amount paid is required and must be a valid number (e.g., 50.00)</p>}
         </div>
 
         {/* Payment Date */}

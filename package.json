@@ -24,6 +24,7 @@
     "react-scripts": "5.0.1",
     "recharts": "^2.8.0"
   },
+  "proxy": "https://api.jsonbin.io",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",

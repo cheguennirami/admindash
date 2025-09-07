@@ -12,7 +12,7 @@ import { orderOps, providerPaymentOps } from '../../services/jsonbin-new';
 import ProviderPaymentForm from '../payments/ProviderPaymentForm';
 import StatsCard from '../common/StatsCard';
 import LoadingSpinner from '../common/LoadingSpinner';
-import LogistiqueFranceForm from '../logistics/LogistiqueFranceForm';
+import OrderStatusForm from '../../components/orders/OrderStatusForm';
 import { PieChart, Pie, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { startOfMonth, format } from 'date-fns';
 
@@ -118,6 +118,21 @@ const LogisticsDashboard = () => {
     }
   };
 
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm('Are you sure you want to delete this provider payment?')) {
+      return;
+    }
+    try {
+      setError(null);
+      await providerPaymentOps.deleteProviderPayment(paymentId);
+      await loadData();
+      console.log('✅ Provider payment deleted');
+    } catch (err) {
+      console.error('❌ Failed to delete provider payment:', err);
+      setError('Failed to delete provider payment');
+    }
+  };
+
   const statusBreakdown = orders.reduce((acc, order) => {
     acc[order.status] = (acc[order.status] || 0) + 1;
     return acc;
@@ -172,7 +187,7 @@ const LogisticsDashboard = () => {
               Logistics Dashboard 🚚
             </h1>
             <p className="text-blue-100">
-              Manage France communications and track order movements.
+              Follow order status and manage logistics.
             </p>
           </div>
           <div className="hidden md:block">
@@ -402,12 +417,18 @@ const LogisticsDashboard = () => {
                         <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
                           {payment.dueDate ? new Date(payment.dueDate).toLocaleDateString() : '-'}
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium flex space-x-2">
                           <button
                             onClick={() => setEditingProviderPayment(payment)}
                             className="px-3 py-1 bg-blue-100 text-blue-800 rounded text-xs hover:bg-blue-200"
                           >
                             Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeletePayment(payment.id)}
+                            className="px-3 py-1 bg-red-100 text-red-800 rounded text-xs hover:bg-red-200"
+                          >
+                            Delete
                           </button>
                         </td>
                       </tr>
@@ -445,11 +466,11 @@ const LogisticsDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Orders List */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">France Orders</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Orders to Follow</h3>
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {orders.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
-                No orders available from France
+                No orders available to follow
               </div>
             ) : (
               orders.map((order) => (
@@ -471,20 +492,16 @@ const LogisticsDashboard = () => {
                   <div className="text-sm text-gray-600">
                     Order: {order.orderId || order._id}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    Communications: {order.communications?.length || 0}
-                  </div>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        {/* Logistique France Form */}
+        {/* Order Status Form */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <LogistiqueFranceForm
+          <OrderStatusForm
             selectedOrder={selectedOrder}
-            onCommunicationSent={loadData}
             onStatusUpdated={loadData}
             error={error}
           />

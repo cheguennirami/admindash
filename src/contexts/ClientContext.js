@@ -27,7 +27,7 @@ export const ClientProvider = ({ children }) => {
         await initializeAppData();
         
         // Get clients from JSONBin service
-        const clientData = clientOps.getClients();
+        const clientData = await clientOps.getClients();
         setClients(clientData);
         setError(null);
       } catch (err) {
@@ -46,7 +46,7 @@ export const ClientProvider = ({ children }) => {
   const addClient = async (clientData) => {
     try {
       setLoading(true);
-      const newClient = clientOps.addClient(clientData);
+      const newClient = await clientOps.addClient(clientData);
       setClients(prev => [...prev, newClient]);
       toast.success('Client added successfully');
       return { success: true, client: newClient };
@@ -63,8 +63,8 @@ export const ClientProvider = ({ children }) => {
   const updateClient = async (clientId, updates) => {
     try {
       setLoading(true);
-      const updatedClient = clientOps.updateClient(clientId, updates);
-      setClients(prev => 
+      const updatedClient = await clientOps.updateClient(clientId, updates);
+      setClients(prev =>
         prev.map(client => client._id === clientId ? updatedClient : client)
       );
       toast.success('Client updated successfully');
@@ -82,7 +82,7 @@ export const ClientProvider = ({ children }) => {
   const deleteClient = async (clientId) => {
     try {
       setLoading(true);
-      clientOps.deleteClient(clientId);
+      await clientOps.deleteClient(clientId);
       setClients(prev => prev.filter(client => client._id !== clientId));
       toast.success('Client deleted successfully');
       return { success: true };
@@ -96,9 +96,9 @@ export const ClientProvider = ({ children }) => {
   };
 
   // Get a client by ID
-  const getClient = (clientId) => {
+  const getClient = async (clientId) => {
     try {
-      return clientOps.getClient(clientId);
+      return await clientOps.getClient(clientId);
     } catch (err) {
       console.error('Error getting client:', err);
       return null;
@@ -114,7 +114,7 @@ export const ClientProvider = ({ children }) => {
       await initializeAppData();
       
       // Get fresh clients data
-      const clientData = clientOps.getClients();
+      const clientData = await clientOps.getClients();
       setClients(clientData);
       setError(null);
       toast.success('Clients refreshed from JSONBin');

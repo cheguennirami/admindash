@@ -27,7 +27,7 @@ export const PaymentProvider = ({ children }) => {
         await initializeAppData();
         
         // Get payments from JSONBin service
-        const paymentData = paymentOps.getPayments();
+        const paymentData = await paymentOps.getPayments();
         setPayments(paymentData);
         setError(null);
       } catch (err) {
@@ -46,7 +46,7 @@ export const PaymentProvider = ({ children }) => {
   const addPayment = async (paymentData) => {
     try {
       setLoading(true);
-      const newPayment = paymentOps.addPayment(paymentData);
+      const newPayment = await paymentOps.addPayment(paymentData);
       setPayments(prev => [...prev, newPayment]);
       toast.success('Payment added successfully');
       return { success: true, payment: newPayment };
@@ -63,7 +63,7 @@ export const PaymentProvider = ({ children }) => {
   const deletePayment = async (paymentId) => {
     try {
       setLoading(true);
-      paymentOps.deletePayment(paymentId);
+      await paymentOps.deletePayment(paymentId);
       setPayments(prev => prev.filter(payment => payment._id !== paymentId));
       toast.success('Payment deleted successfully');
       return { success: true };
@@ -77,9 +77,9 @@ export const PaymentProvider = ({ children }) => {
   };
 
   // Get payments for a specific client
-  const getClientPayments = (clientId) => {
+  const getClientPayments = async (clientId) => {
     try {
-      return paymentOps.getClientPayments(clientId);
+      return await paymentOps.getClientPayments(clientId);
     } catch (err) {
       console.error('Error getting client payments:', err);
       return [];
@@ -95,7 +95,7 @@ export const PaymentProvider = ({ children }) => {
       await initializeAppData();
       
       // Get fresh payments data
-      const paymentData = paymentOps.getPayments();
+      const paymentData = await paymentOps.getPayments();
       setPayments(paymentData);
       setError(null);
       toast.success('Payments refreshed from JSONBin');

@@ -86,7 +86,7 @@ const jsonbinAPI = {
       try {
         const controller = new AbortController();
         const requestTimeoutId = setTimeout(() => controller.abort(), 10000);
-
+ 
         const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
           method: 'GET',
           headers: {
@@ -130,7 +130,7 @@ const jsonbinAPI = {
       try {
         const controller = new AbortController();
         const putTimeoutId = setTimeout(() => controller.abort(), 10000);
-
+ 
         const response = await fetch(`${JSONBIN_BASE_URL}/${JSONBIN_BIN_ID}`, {
           method: 'PUT',
           headers: {
@@ -195,16 +195,50 @@ const localStorageOps = {
 
 export const dataManager = {
   async loadData() {
+    let data;
     if (JSONBIN_API_KEY && JSONBIN_BIN_ID) {
       const remoteData = await jsonbinAPI.get();
       if (remoteData?.record) {
-        localStorageOps.set(remoteData.record);
-        return remoteData.record;
+        data = remoteData.record;
+        localStorageOps.set(data);
+      } else {
+        data = localStorageOps.get();
+      }
+    } else {
+      data = localStorageOps.get();
+    }
+
+    // Data migration: Ensure all clients have an associated order
+    if (data.clients && data.orders) {
+      const clientIdsWithOrders = new Set(data.orders.map(order => order.clientId));
+      const clientsWithoutOrders = data.clients.filter(client => !clientIdsWithOrders.has(client._id));
+
+      if (clientsWithoutOrders.length > 0) {
+        console.log(`Migrating ${clientsWithoutOrders.length} clients to create associated orders.`);
+        clientsWithoutOrders.forEach(client => {
+          const newOrder = {
+            _id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-migrated`,
+            clientId: client._id,
+            clientName: client.fullName,
+            orderId: client.orderId || `ORD-${Date.now()}-migrated`,
+            status: client.status || 'in_progress',
+            confirmation: client.confirmation || 'pending',
+            buyingPrice: client.totalBuyingPrice,
+            sellingPrice: client.totalSellingPrice,
+            articles: client.articles,
+            screenshots: client.screenshots,
+            communications: [],
+            trackingUpdates: [],
+            createdAt: client.createdAt,
+            updatedAt: new Date().toISOString()
+          };
+          data.orders.push(newOrder);
+        });
+        await dataManager.saveData(data); // Save the migrated data
       }
     }
 
-    const localData = localStorageOps.get();
-    return localData;
+    return data;
   },
 
   async saveData(data) {
@@ -339,6 +373,26 @@ export const clientOps = {
     };
 
     data.clients = [...(data.clients || []), newClient];
+
+    // Also create an associated order for the new client
+    const newOrder = {
+      _id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      clientId: newClient._id,
+      clientName: newClient.fullName,
+      orderId: newClient.orderId,
+      status: newClient.status,
+      confirmation: newClient.confirmation,
+      buyingPrice: newClient.totalBuyingPrice,
+      sellingPrice: newClient.totalSellingPrice,
+      articles: newClient.articles,
+      screenshots: newClient.screenshots,
+      communications: [],
+      trackingUpdates: [],
+      createdAt: newClient.createdAt,
+      updatedAt: newClient.updatedAt
+    };
+    data.orders = [...(data.orders || []), newOrder];
+
     await dataManager.saveData(data);
 
     return newClient;
@@ -358,6 +412,24 @@ export const clientOps = {
       updatedAt: new Date().toISOString()
     };
 
+    await dataManager.saveData(data);
+
+    // Also update the associated order
+    const orderIndex = data.orders?.findIndex(o => o.clientId === clientId);
+    if (orderIndex !== -1 && orderIndex !== undefined) {
+      data.orders[orderIndex] = {
+        ...data.orders[orderIndex],
+        clientName: updates.fullName || data.orders[orderIndex].clientName,
+        orderId: updates.orderId || data.orders[orderIndex].orderId,
+        status: updates.status || data.orders[orderIndex].status,
+        confirmation: updates.confirmation || data.orders[orderIndex].confirmation,
+        buyingPrice: updates.totalBuyingPrice || data.orders[orderIndex].buyingPrice,
+        sellingPrice: updates.totalSellingPrice || data.orders[orderIndex].sellingPrice,
+        articles: updates.articles || data.orders[orderIndex].articles,
+        screenshots: updates.screenshots || data.orders[orderIndex].screenshots,
+        updatedAt: new Date().toISOString()
+      };
+    }
     await dataManager.saveData(data);
     return data.clients[clientIndex];
   },
@@ -503,6 +575,7 @@ export const paymentOps = {
 export const orderOps = {
   async getOrders() {
     const data = await dataManager.loadData();
+    console.log('orderOps.getOrders - Raw data.orders:', data.orders);
     return data.orders || [];
   },
 

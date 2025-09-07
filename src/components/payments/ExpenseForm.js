@@ -35,6 +35,8 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
         setUsers(userList);
         setExpenseCategories(categoriesData.expense);
         setIncomeCategories(categoriesData.income);
+        console.log('Fetched clients:', clientList);
+        console.log('Fetched users:', userList);
       } catch (err) {
         console.error('❌ Failed to load data:', err);
       }
@@ -46,8 +48,14 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.description || !formData.amount || (formData.type === 'expense' && (!formData.relatedEntityId || formData.relatedEntityType !== 'user')) || (formData.type === 'income' && (!formData.relatedEntityId || formData.relatedEntityType !== 'client'))) {
+    if (!formData.description || !formData.amount) {
       setError(t('fill_all_required_fields'));
+      return;
+    }
+
+    // Additional validation for related entity if selected
+    if (formData.relatedEntityId && !formData.relatedEntityType) {
+      setError(t('select_related_entity_type'));
       return;
     }
 
@@ -168,7 +176,7 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
                   name="type"
                   value="expense"
                   checked={formData.type === 'expense'}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value, relatedEntityId: '', relatedEntityType: '' })}
                   className="mr-2"
                 />
                 <span className="text-sm text-gray-700">{t('expense')}</span>
@@ -179,7 +187,7 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
                   name="type"
                   value="income"
                   checked={formData.type === 'income'}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value, relatedEntityId: '', relatedEntityType: '' })}
                   className="mr-2"
                 />
                 <span className="text-sm text-gray-700">{t('income')}</span>
@@ -249,17 +257,16 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
             <div className="relative">
               <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <select
-                value={formData.relatedEntityId ? `user-${formData.relatedEntityId}` : ''}
+                value={formData.relatedEntityId || ''}
                 onChange={(e) => {
-                  const [type, id] = e.target.value.split('-');
-                  setFormData({ ...formData, relatedEntityId: id, relatedEntityType: type });
+                  const id = e.target.value;
+                  setFormData({ ...formData, relatedEntityId: id, relatedEntityType: id ? 'user' : '' });
                 }}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
               >
                 <option value="">{t('select_user')}</option>
                 {users.filter(user => user.isActive).map(user => (
-                  <option key={`user-${user._id}`} value={`user-${user._id}`}>
+                  <option key={user._id} value={user._id}>
                     {user.fullName} - {user.email} ({t(user.role)})
                   </option>
                 ))}
@@ -277,24 +284,31 @@ const ExpenseForm = ({ onExpenseAdded, transactionType = 'both' }) => {
             <div className="relative">
               <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <select
-                value={formData.relatedEntityId ? `${formData.relatedEntityType}-${formData.relatedEntityId}` : ''}
+                value={formData.relatedEntityId || ''}
                 onChange={(e) => {
-                  const [type, id] = e.target.value.split('-');
-                  setFormData({ ...formData, relatedEntityId: id, relatedEntityType: type });
+                  const value = e.target.value;
+                  if (value === '') {
+                    setFormData({ ...formData, relatedEntityId: '', relatedEntityType: '' });
+                  } else {
+                    // Determine if it's a client or user based on the ID format or a separate mechanism
+                    // For now, assume if it's in clients list, it's a client, else a user
+                    const isClient = clients.some(client => client._id === value);
+                    setFormData({ ...formData, relatedEntityId: value, relatedEntityType: isClient ? 'client' : 'user' });
+                  }
                 }}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">{t('select_client_or_user_optional')}</option>
                 <optgroup label={t('clients')}>
                   {clients.map(client => (
-                    <option key={`client-${client._id}`} value={`client-${client._id}`}>
+                    <option key={client._id} value={client._id}>
                       {client.fullName} ({t('client')}) - {client.phoneNumber}
                     </option>
                   ))}
                 </optgroup>
                 <optgroup label={t('users')}>
                   {users.filter(user => user.isActive).map(user => (
-                    <option key={`user-${user._id}`} value={`user-${user._id}`}>
+                    <option key={user._id} value={user._id}>
                       {user.fullName} ({t('user')}) - {user.email}
                     </option>
                   ))}

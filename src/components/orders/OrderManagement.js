@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { clientOps } from '../../services/jsonbin-new'; // Import local services
+import { clientOps, orderOps } from '../../services/jsonbin-new'; // Import local services
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -35,30 +35,43 @@ const OrderManagement = () => {
     try {
       setLoading(true);
       setError('');
-      // Fetch clients and treat them as orders
-      const clients = await clientOps.getClients();
+      
+      const allOrders = await orderOps.getOrders();
+      console.log('All orders fetched:', allOrders);
+      const allClients = await clientOps.getClients();
+      console.log('All clients fetched:', allClients);
+      const clientMap = new Map(allClients.map(client => [client._id, client]));
 
-      // Filter by status if needed
-      let filteredClients = clients;
+      const enrichedOrders = allOrders.map(order => {
+        const client = clientMap.get(order.clientId);
+        return {
+          ...order,
+          clientName: client ? client.fullName : order.clientName || 'N/A',
+          phoneNumber: client ? client.phoneNumber : order.phoneNumber || 'N/A',
+        };
+      });
+      console.log('Enriched orders:', enrichedOrders);
+
+      let filteredOrders = enrichedOrders;
       if (statusFilter) {
-        filteredClients = clients.filter(client => client.status === statusFilter);
+        filteredOrders = enrichedOrders.filter(order => order.status === statusFilter);
       }
 
       if (user?.role === 'logistics') {
-        filteredClients = filteredClients.filter(client => client.status === 'delivered_to_france');
+        filteredOrders = filteredOrders.filter(order => order.status === 'delivered_to_france');
       }
+      console.log('Filtered orders:', filteredOrders);
 
-      // Simple pagination (just in-memory for now)
       const startIndex = (currentPage - 1) * 10;
       const endIndex = startIndex + 10;
-      const paginatedClients = filteredClients.slice(startIndex, endIndex);
+      const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+      console.log('Paginated orders:', paginatedOrders);
 
-      setOrders(paginatedClients);
-      setTotalPages(Math.ceil(filteredClients.length / 10));
+      setOrders(paginatedOrders);
+      setTotalPages(Math.ceil(filteredOrders.length / 10));
 
-      // Calculate status counts
-      const statusCount = filteredClients.reduce((acc, client) => {
-        const status = client.status || 'in_progress';
+      const statusCount = filteredOrders.reduce((acc, order) => {
+        const status = order.status || 'in_progress';
         acc[status] = (acc[status] || 0) + 1;
         return acc;
       }, {});
@@ -80,10 +93,9 @@ const OrderManagement = () => {
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setError('');
-      // Update client status (clients are treated as orders)
-      clientOps.updateClient(orderId, { status: newStatus });
+      await orderOps.updateOrder(orderId, { status: newStatus });
       toast.success(t('order_status_updated_successfully'));
-      fetchOrders(); // Re-fetch orders to update the list
+      fetchOrders();
     } catch (err) {
       const errorMessage = err.message || t('failed_to_update_order_status');
       setError(errorMessage);
@@ -98,10 +110,10 @@ const OrderManagement = () => {
 
     try {
       console.log('🗑️ Deleting order:', orderId);
-      await clientOps.updateClient(orderId, { status: 'cancelled' });
+      await orderOps.deleteOrder(orderId); // Use orderOps.deleteOrder
       toast.success(t('order_deleted_successfully'));
       console.log('✅ Order deleted from JSONBin');
-      await fetchOrders(); // Refresh the list
+      await fetchOrders();
     } catch (error) {
       console.error('❌ Error deleting order:', error);
       toast.error(t('failed_to_delete_order'));
@@ -115,25 +127,25 @@ const OrderManagement = () => {
 
   const handleExportOrders = async () => {
     try {
-      const allClients = await clientOps.getClients();
+      const allOrders = await orderOps.getOrders(); // Fetch actual orders
       const headers = [
         t('order_id'), t('client_name'), t('phone_number'), t('selling_price'), t('buying_price'),
         t('advance_amount'), t('remaining_amount'), t('status'), t('confirmation'), t('created_at')
       ];
       const csvRows = [headers.join(',')];
 
-      allClients.forEach(client => {
+      allOrders.forEach(order => {
         csvRows.push([
-          client.orderId,
-          client.fullName,
-          client.phoneNumber,
-          client.sellingPrice,
-          client.buyingPrice,
-          client.advanceAmount,
-          client.remainingAmount,
-          client.status,
-          client.confirmation,
-          new Date(client.createdAt).toLocaleDateString()
+          order.orderId,
+          order.clientName,
+          order.phoneNumber, // Assuming phoneNumber is part of the order or can be fetched
+          order.sellingPrice,
+          order.buyingPrice,
+          order.advanceAmount, // Assuming these are part of the order
+          order.remainingAmount, // Assuming these are part of the order
+          order.status,
+          order.confirmation,
+          new Date(order.createdAt).toLocaleDateString()
         ].map(field => `"${field}"`).join(','));
       });
 
@@ -255,13 +267,13 @@ const OrderManagement = () => {
                         {order.orderId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.fullName}
+                        {order.clientName}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.phoneNumber}
+                        {order.phoneNumber || 'N/A'} {/* Use order.phoneNumber */}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {order.sellingPrice} TND
+                        {order.sellingPrice?.toFixed(2) || '0.00'} TND {/* Use order.sellingPrice */}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
