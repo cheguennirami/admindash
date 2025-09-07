@@ -11,7 +11,7 @@ export const jsonbinConfig = {
   FALLBACK_BIN_ID: '68b44389d0ea881f406cf3ea',
 
   // Base URL
-  BASE_URL: '/v3/b',
+  BASE_URL: 'https://api.jsonbin.io/v3/b',
 };
 
 // Get the final configuration (environment variable or fallback)

@@ -8,24 +8,29 @@ export const initializeApp = async () => {
   try {
     console.log('🚀 Initializing app and connecting to JSONBin...');
 
-    // Configuration with fallbacks
-    const apiKey = process.env.REACT_APP_JSONBIN_API_KEY || '$2a$10$Twch63QhrK5EKGmGCrECfOxy0whAiFxFGWcDyOdWoKpuO0cpaIBge';
-    const binId = process.env.REACT_APP_JSONBIN_BIN_ID || '68b44389d0ea881f406cf3ea';
+    // Get configuration with fallbacks
+    const { apiKey, binId, baseUrl, isUsingFallback } = getFinalConfig();
 
     console.log('🔧 Configuration Check:');
     console.log(`✅ API Key: ${apiKey ? '[config present]' : 'MISSING'}`);
     console.log(`✅ Bin ID: ${binId}`);
-    // Use the baseUrl from getFinalConfig for accurate logging
-    const { baseUrl: finalBaseUrl } = getFinalConfig();
-    console.log(`🔗 JSONBin URL: ${finalBaseUrl}/${binId}`);
+    console.log(`🔗 JSONBin URL: ${baseUrl}/${binId}`);
+    if (isUsingFallback) {
+      console.warn('⚠️ Using fallback configuration');
+    }
 
     if (!apiKey || !binId) {
-      console.warn('⚠️ Using fallback configuration');
-      toast.error('Using fallback configuration - some data may not persist.', {
+      toast.error('JSONBin API Key or Bin ID is missing. Using local storage.', {
         duration: 3000,
         icon: '⚠️',
       });
       return false;
+    }
+    if (isUsingFallback) {
+      toast.error('Using fallback configuration - some data may not persist.', {
+        duration: 3000,
+        icon: '⚠️',
+      });
     }
     
     // Initialize data from JSONBin
