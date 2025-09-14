@@ -94,12 +94,6 @@ const ClientReceipt = () => {
           <p className="text-base text-gray-900">{client.address}</p>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-200 pt-6">
-        <div>
-          <p className="text-sm font-medium text-gray-500">{t('buying_price')}</p>
-          <p className="text-base text-gray-900">{client.buyingPrice} TND</p>
-        </div>
         <div>
           <p className="text-sm font-medium text-gray-500">{t('selling_price')}</p>
           <p className="text-base text-gray-900">{client.sellingPrice} TND</p>
